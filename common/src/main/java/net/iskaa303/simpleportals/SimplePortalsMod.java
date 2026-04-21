@@ -1,11 +1,18 @@
 package net.iskaa303.simpleportals;
 
-import net.iskaa303.simpleportals.platform.Services;
+import javax.annotation.Nonnull;
+
+import net.iskaa303.simpleportals.registry.SimplePortalsItems;
+import net.minecraft.resources.ResourceLocation;
 
 public class SimplePortalsMod {
+    private SimplePortalsMod() {}
+
     public static void init() {
-        if (Services.PLATFORM.isModLoaded(Constants.MOD_ID)) {
-            Constants.LOG.info("{} loaded!", Constants.MOD_NAME);
-        }
+        SimplePortalsItems.bootstrap();
+    }
+
+    public static ResourceLocation path(final @Nonnull String path) {
+        return ResourceLocation.fromNamespaceAndPath(Constants.MOD_ID, path);
     }
 }

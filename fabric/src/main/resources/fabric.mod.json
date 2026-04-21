@@ -16,7 +16,7 @@
     "environment": "*",
     "entrypoints": {
         "main": [
-            "net.iskaa303.simpleportals.SimplePortals"
+            "net.iskaa303.simpleportals.SimplePortalsModFabric"
         ]
     },
     "mixins": [
