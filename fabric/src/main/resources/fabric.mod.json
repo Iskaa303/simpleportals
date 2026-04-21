@@ -17,6 +17,9 @@
     "entrypoints": {
         "main": [
             "net.iskaa303.simpleportals.SimplePortalsModFabric"
+        ],
+        "client": [
+            "net.iskaa303.simpleportals.SimplePortalsModFabricClient"
         ]
     },
     "mixins": [
