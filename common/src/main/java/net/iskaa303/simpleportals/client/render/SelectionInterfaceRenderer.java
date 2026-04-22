@@ -2,6 +2,10 @@ package net.iskaa303.simpleportals.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+
+import foundry.veil.api.client.render.rendertype.VeilRenderType;
+import net.iskaa303.simpleportals.Constants;
+import net.iskaa303.simpleportals.SimplePortalsMod;
 import net.iskaa303.simpleportals.item.DebugStick;
 import net.iskaa303.simpleportals.registry.SimplePortalsItems;
 import net.minecraft.client.Camera;
@@ -11,6 +15,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.BlockHitResult;
@@ -28,6 +33,8 @@ public class SelectionInterfaceRenderer {
     private static final double GRID_LINE_THICKNESS = 0.002;
     private static final double PLAYER_VISIBLE_DISTANCE = 6.0;
     private static final double PLAYER_FADE_DISTANCE = 2.0;
+
+    private static final ResourceLocation SELECTION_INTERFACE_RENDER_TYPE = SimplePortalsMod.path("selection_interface");
 
     private static Vec3 smoothedRenderPos;
 
@@ -56,8 +63,11 @@ public class SelectionInterfaceRenderer {
         }
         if (targetPos == null) return;
 
-        RenderType renderType = RenderType.guiOverlay();
-        if (renderType == null) return;
+        RenderType renderType = VeilRenderType.get(SELECTION_INTERFACE_RENDER_TYPE, "simpleportals:item/debug_stick");
+        if (renderType == null) {
+            Constants.LOG.error("Failed to get RenderType for selection interface", SELECTION_INTERFACE_RENDER_TYPE);
+            return;
+        }
 
         Vec3 renderPos = smoothRenderPos(targetPos, player.isShiftKeyDown());
         VertexConsumer builder = mc.renderBuffers().bufferSource().getBuffer(renderType);
@@ -122,16 +132,21 @@ public class SelectionInterfaceRenderer {
         double centerA = getPlaneAxis(renderPos, normal, true);
         double centerB = getPlaneAxis(renderPos, normal, false);
 
-        for (double a = snapToGrid(centerA - GRID_RENDER_RADIUS); a <= centerA + GRID_RENDER_RADIUS; a += BOX_SIZE) {
+        double startA = snapToGrid(centerA - GRID_RENDER_RADIUS);
+        double startB = snapToGrid(centerB - GRID_RENDER_RADIUS);
+
+        for (double a = startA; a <= centerA + GRID_RENDER_RADIUS; a += BOX_SIZE) {
             renderGridLine(poseStack, builder, normal, anchor, a, centerB - GRID_RENDER_RADIUS, centerB + GRID_RENDER_RADIUS, centerA, centerB, camPos, true, playerDistanceFade);
         }
-        for (double b = snapToGrid(centerB - GRID_RENDER_RADIUS); b <= centerB + GRID_RENDER_RADIUS; b += BOX_SIZE) {
+        for (double b = startB; b <= centerB + GRID_RENDER_RADIUS; b += BOX_SIZE) {
             renderGridLine(poseStack, builder, normal, anchor, b, centerA - GRID_RENDER_RADIUS, centerA + GRID_RENDER_RADIUS, centerB, centerA, camPos, false, playerDistanceFade);
         }
     }
 
     private static void renderGridLine(PoseStack ps, VertexConsumer b, Direction n, Vec3 anc, double fix, double minV, double maxV, double fixC, double varC, @Nonnull Vec3 cam, boolean isFixA, float playerFade) {
-        float baseAlpha = (Math.abs(Math.round(fix / BOX_SIZE) - Math.round(fixC / BOX_SIZE)) % 4 == 0) ? 0.95f : 0.62f;
+        double gridCoord = Math.abs(fix);
+        boolean isBlockBoundary = Math.abs(gridCoord - Math.round(gridCoord)) < 0.01;
+        float baseAlpha = isBlockBoundary ? 0.95f : 0.62f;
 
         for (double v = minV; v < maxV; v += BOX_SIZE) {
             double nextV = v + BOX_SIZE;
