@@ -10,6 +10,7 @@ import net.iskaa303.simpleportals.item.DebugStick;
 import net.iskaa303.simpleportals.registry.SimplePortalsItems;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderType;
@@ -17,16 +18,19 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
+import java.util.List;
+
 import javax.annotation.Nonnull;
 
 public class SelectionInterfaceRenderer {
     private static final double REACH = 10.0;
-    private static final double BOX_SIZE = 0.25;
+    private static final double BOX_SIZE = 0.125;
     private static final double GRID_RENDER_RADIUS = 3.0;
     private static final double GRID_FADE_DISTANCE = 1.0;
     private static final double SNAP_SMOOTHING = 0.38;
@@ -43,7 +47,12 @@ public class SelectionInterfaceRenderer {
     public static void render(@Nonnull PoseStack poseStack, float partialTicks) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
-        if (player == null || mc.level == null || !isHoldingDebugStick(player)) return;
+        if (player == null || mc.level == null) return;
+
+        DebugStick stick = SimplePortalsItems.DEBUG_STICK.get();
+        if (stick == null) return;
+        ItemStack stickStack = player.getMainHandItem().is(stick) ? player.getMainHandItem() : player.getOffhandItem();
+        if (!stickStack.is(stick)) return;
 
         Camera camera = mc.gameRenderer.getMainCamera();
         Vec3 eyePos = camera.getPosition();
@@ -58,7 +67,12 @@ public class SelectionInterfaceRenderer {
         BlockHitResult hitResult = level.clip(new ClipContext(eyePos, reachVec, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player));
         
         Vec3 targetPos = hitResult.getType() != HitResult.Type.MISS ? hitResult.getLocation() : reachVec;
-        if (player.isShiftKeyDown()) {
+        if (targetPos == null) return;
+        List<Vec3> savedPoints = DebugStick.getPoints(stickStack);
+        if (Screen.hasControlDown() && !savedPoints.isEmpty()) {
+            Vec3 nearest = getNearestPoint(targetPos, savedPoints);
+            if (nearest != null) targetPos = nearest;
+        } else if (player.isShiftKeyDown()) {
             targetPos = hitResult.getType() != HitResult.Type.MISS ? snapToSurface(hitResult) : snapToGrid(targetPos);
         }
         if (targetPos == null) return;
@@ -69,7 +83,7 @@ public class SelectionInterfaceRenderer {
             return;
         }
 
-        Vec3 renderPos = smoothRenderPos(targetPos, player.isShiftKeyDown());
+        Vec3 renderPos = smoothRenderPos(targetPos, player.isShiftKeyDown() || Screen.hasControlDown());
         VertexConsumer builder = mc.renderBuffers().bufferSource().getBuffer(renderType);
         if (builder == null) return;
 
@@ -78,17 +92,13 @@ public class SelectionInterfaceRenderer {
         
         renderGrid(poseStack, eyePos, lookVec, hitResult, targetPos, builder);
         renderBox(poseStack, eyePos, renderPos, builder);
+        renderFilledBox(poseStack, eyePos, stickStack, builder);
         
         mc.renderBuffers().bufferSource().endBatch(renderType);
         poseStack.popPose();
     }
 
     // --- Logic ---
-
-    private static boolean isHoldingDebugStick(LocalPlayer player) {
-        DebugStick stick = SimplePortalsItems.DEBUG_STICK.get();
-        return stick != null && (player.getMainHandItem().is(stick) || player.getOffhandItem().is(stick));
-    }
 
     private static Vec3 snapToGrid(Vec3 pos) {
         return new Vec3(Mth.floor(pos.x / BOX_SIZE) * BOX_SIZE, Mth.floor(pos.y / BOX_SIZE) * BOX_SIZE, Mth.floor(pos.z / BOX_SIZE) * BOX_SIZE);
@@ -146,7 +156,9 @@ public class SelectionInterfaceRenderer {
     private static void renderGridLine(PoseStack ps, VertexConsumer b, Direction n, Vec3 anc, double fix, double minV, double maxV, double fixC, double varC, @Nonnull Vec3 cam, boolean isFixA, float playerFade) {
         double gridCoord = Math.abs(fix);
         boolean isBlockBoundary = Math.abs(gridCoord - Math.round(gridCoord)) < 0.01;
-        float baseAlpha = isBlockBoundary ? 0.95f : 0.62f;
+        
+        float baseAlpha = isBlockBoundary ? 1.00f : 0.62f;
+        double thicknessScale = isBlockBoundary ? 3.0 : 1.0; 
 
         for (double v = minV; v < maxV; v += BOX_SIZE) {
             double nextV = v + BOX_SIZE;
@@ -159,7 +171,8 @@ public class SelectionInterfaceRenderer {
             Vec3 end = createPoint(n, anc, isFixA ? fix : nextV, isFixA ? nextV : fix);
             Vec3i normalVecInt = n.getNormal();
             if (normalVecInt == null) continue;
-            renderLine(ps, b, start, end, alpha, Vec3.atLowerCornerOf(normalVecInt), cam);
+            
+            renderLine(ps, b, start, end, alpha, Vec3.atLowerCornerOf(normalVecInt), cam, thicknessScale);
         }
     }
 
@@ -180,14 +193,65 @@ public class SelectionInterfaceRenderer {
         }
     }
 
+    // --- Filled Box Rendering ---
+
+    private static void renderFilledBox(PoseStack ps, @Nonnull Vec3 camPos, ItemStack stickStack, VertexConsumer builder) {
+        List<Vec3> points = DebugStick.getPoints(stickStack);
+        if (points.isEmpty()) return;
+
+        float h = (float) (BOX_SIZE / 2.0);
+        float r = 0.6f, g = 0.8f, bl = 1.0f, a = 0.5f;
+        PoseStack.Pose last = ps.last();
+        if (last == null) return;
+
+        for (Vec3 center : points) {
+            for (Direction dir : Direction.values()) {
+                renderFace(last, builder, center, h, r, g, bl, a, dir);
+            }
+        }
+    }
+
+    private static void renderFace(@Nonnull PoseStack.Pose last, VertexConsumer b, Vec3 center, float h, float r, float g, float bl, float a, Direction dir) {
+        Vec3i normalVecInt = dir.getNormal();
+        if (normalVecInt == null) return;
+        Vec3 n = Vec3.atLowerCornerOf(normalVecInt);
+        
+        Vec3 tangent = (Math.abs(n.y) > 0.5) ? new Vec3(1, 0, 0) : new Vec3(0, 1, 0);
+        Vec3 u = n.cross(tangent).normalize().scale(h);
+        if (u == null) return;
+        Vec3 v = n.cross(u).normalize().scale(h);
+        if (v == null) return;
+
+        Vec3 scaledN = n.scale(h + 0.001);
+        if (scaledN == null) return;
+        Vec3 fC = center.add(scaledN);
+
+        Vec3 p1 = fC.subtract(u).subtract(v);
+        Vec3 p2 = fC.add(u).subtract(v);
+        Vec3 p3 = fC.add(u).add(v);
+        Vec3 p4 = fC.subtract(u).add(v);
+
+        b.addVertex(last, (float)p1.x, (float)p1.y, (float)p1.z).setColor(r, g, bl, a);
+        b.addVertex(last, (float)p2.x, (float)p2.y, (float)p2.z).setColor(r, g, bl, a);
+        b.addVertex(last, (float)p3.x, (float)p3.y, (float)p3.z).setColor(r, g, bl, a);
+        b.addVertex(last, (float)p4.x, (float)p4.y, (float)p4.z).setColor(r, g, bl, a);
+    }
+
     // --- Utils ---
 
     private static void renderLine(PoseStack ps, VertexConsumer b, Vec3 s, Vec3 e, float alpha, Vec3 normal, @Nonnull Vec3 cam) {
-        if (s == null) return;
+        renderLine(ps, b, s, e, alpha, normal, cam, 1.0);
+    }
+
+    private static void renderLine(PoseStack ps, VertexConsumer b, Vec3 s, Vec3 e, float alpha, Vec3 normal, @Nonnull Vec3 cam, double thicknessScale) {
+        if (s == null || e == null) return;
+        
         Vec3 dir = e.subtract(s).normalize();
         Vec3 view = s.add(e).scale(0.5).subtract(cam).normalize();
         if (view == null) return;
-        Vec3 offset = dir.cross(view).normalize().scale(GRID_LINE_THICKNESS * (s.distanceTo(cam) * 0.25 + 1.0));
+
+        double thickness = GRID_LINE_THICKNESS * thicknessScale;
+        Vec3 offset = dir.cross(view).normalize().scale(thickness * (s.distanceTo(cam) * 0.25 + 1.0));
 
         PoseStack.Pose last = ps.last();
         if (last == null) return;
@@ -212,6 +276,24 @@ public class SelectionInterfaceRenderer {
             case Y -> isA ? p.x : p.z;
             case Z -> isA ? p.x : p.y;
         };
+    }
+
+    public static Vec3 getCurrentTarget() {
+        return smoothedRenderPos;
+    }
+
+    private static Vec3 getNearestPoint(@Nonnull Vec3 target, List<Vec3> points) {
+        Vec3 nearest = null;
+        double minSqrDist = Double.MAX_VALUE;
+
+        for (Vec3 point : points) {
+            double distSqr = point.distanceToSqr(target);
+            if (distSqr < minSqrDist) {
+                minSqrDist = distSqr;
+                nearest = point;
+            }
+        }
+        return nearest;
     }
 
     private static Vec3 createPoint(Direction n, Vec3 anc, double a, double b) {

@@ -2,8 +2,6 @@ package net.iskaa303.simpleportals;
 
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
-import org.joml.Matrix4f;
-
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import net.iskaa303.simpleportals.client.render.SelectionInterfaceRenderer;
@@ -15,21 +13,12 @@ import net.neoforged.fml.common.EventBusSubscriber;
 public class SimplePortalsModNeoforgeClient {
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
-        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
+        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
             PoseStack poseStack = event.getPoseStack();
             if (poseStack == null) return;
 
-            poseStack.pushPose();
-            try {
-                Matrix4f modelViewMatrix = event.getModelViewMatrix();
-                if (modelViewMatrix == null) return;
-                poseStack.mulPose(modelViewMatrix);
-
-                float partialTicks = event.getPartialTick().getGameTimeDeltaTicks();
-                SelectionInterfaceRenderer.render(poseStack, partialTicks);
-            } finally {
-                poseStack.popPose();
-            }
+            float partialTicks = event.getPartialTick().getGameTimeDeltaTicks();
+            SelectionInterfaceRenderer.render(poseStack, partialTicks);
         }
     }
 }

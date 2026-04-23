@@ -9,7 +9,7 @@ import net.iskaa303.simpleportals.client.render.SelectionInterfaceRenderer;
 public class SimplePortalsModFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
-        WorldRenderEvents.LAST.register((context) -> {
+        WorldRenderEvents.AFTER_ENTITIES.register((context) -> {
             PoseStack poseStack = context.matrixStack();
             if (poseStack == null) return;
             float partialTicks = context.tickCounter().getGameTimeDeltaTicks();
