@@ -25,3 +25,7 @@ build
 eclipse
 run
 runs
+
+# devenv
+.devenv/
+devenv.lock
