@@ -1,5 +1,8 @@
 package net.iskaa303.simpleportals.platform;
 
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.player.Player;
+
 import java.nio.file.Path;
 
 /**

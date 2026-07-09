@@ -1,3 +1,8 @@
 {
-    "item.simpleportals.portal_stick": "Point Management Portal Stick"
+    "item.simpleportals.point_stick": "Point Stick",
+    "item.simpleportals.connection_stick": "Connection Stick",
+    "controls.simpleportals.point_stick.line1": "§fRight Click: Create/Delete Point",
+    "controls.simpleportals.point_stick.line2": "§fShift: Snap to Grid   §fCtrl: Snap to Point",
+    "controls.simpleportals.connection_stick.line1": "§fRight Click: Select Endpoint / Create Connection",
+    "controls.simpleportals.connection_stick.line2": "§fShift: Snap to Connection   §fCtrl: Snap to Point"
 }

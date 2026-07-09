@@ -8,37 +8,46 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
-
-/**
- * Renders the control hints and cursor coordinates on the HUD
- * when the player is holding the portal stick.
- */
+/** HUD controls overlay for Point Stick and Connection Stick. */
 public final class ControlsOverlay {
 
     private ControlsOverlay() {}
+
     public static void render(GuiGraphics guiGraphics) {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
         if (player == null) return;
 
-        var stick = SimplePortalsItems.PORTAL_STICK.get();
-        if (stick == null) return;
+        var pointStick = SimplePortalsItems.POINT_STICK.get();
+        var connStick = SimplePortalsItems.CONNECTION_STICK.get();
+        if (pointStick == null && connStick == null) return;
+
         ItemStack main = player.getMainHandItem();
         ItemStack off = player.getOffhandItem();
-        if (!main.is(stick) && !off.is(stick)) return;
+        boolean hasPointStick = pointStick != null && (main.is(pointStick) || off.is(pointStick));
+        boolean hasConnStick = connStick != null && (main.is(connStick) || off.is(connStick));
+        if (!hasPointStick && !hasConnStick) return;
 
         Font font = mc.font;
         int screenW = mc.getWindow().getGuiScaledWidth();
         int screenH = mc.getWindow().getGuiScaledHeight();
 
-        // Build overlay lines
-        String[] lines = {
-                "§fRight Click: Create/Delete Point",
-                "§fShift: Snap to Grid   §fCtrl: Snap to Point"
-        };
+        String[] lines;
+        if (hasConnStick) {
+            lines = new String[]{
+                    Component.translatable("controls.simpleportals.connection_stick.line1").getString(),
+                    Component.translatable("controls.simpleportals.connection_stick.line2").getString()
+            };
+        } else {
+            lines = new String[]{
+                    Component.translatable("controls.simpleportals.point_stick.line1").getString(),
+                    Component.translatable("controls.simpleportals.point_stick.line2").getString()
+            };
+        }
 
         Vec3 target = TargetSelector.getCurrentTarget();
         if (target != null) {
@@ -52,7 +61,6 @@ public final class ControlsOverlay {
             lines = tmp;
         }
 
-        // Measure the widest line
         int textW = 0;
         for (String line : lines) {
             int w = font.width(line);
