@@ -1,9 +1,29 @@
 package net.iskaa303.simpleportals.config;
 
-public enum OverlayPosition {
-    TOP_LEFT, MID_LEFT, BOTTOM_LEFT,
-    TOP_CENTER, MID_CENTER, BOTTOM_CENTER,
-    TOP_RIGHT, MID_RIGHT, BOTTOM_RIGHT;
+public enum OverlayPosition implements ConfigEnum {
+    TOP_LEFT("top_left"), MID_LEFT("mid_left"), BOTTOM_LEFT("bottom_left"),
+    TOP_CENTER("top_center"), MID_CENTER("mid_center"), BOTTOM_CENTER("bottom_center"),
+    TOP_RIGHT("top_right"), MID_RIGHT("mid_right"), BOTTOM_RIGHT("bottom_right");
+
+    private final String name;
+
+    OverlayPosition(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public String getName() {
+        return name;
+    }
+
+    public static OverlayPosition fromName(String name) {
+        for (OverlayPosition pos : values()) {
+            if (pos.name.equals(name)) {
+                return pos;
+            }
+        }
+        return BOTTOM_RIGHT;
+    }
 
     public int getX(int screenWidth, int textWidth) {
         return switch (this) {

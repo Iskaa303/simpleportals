@@ -2,7 +2,7 @@ package net.iskaa303.simpleportals.client.gui;
 
 import net.iskaa303.simpleportals.client.targeting.TargetSelector;
 import net.iskaa303.simpleportals.config.OverlayPosition;
-import net.iskaa303.simpleportals.config.ConfigData;
+import net.iskaa303.simpleportals.config.SimplePortalsConfig;
 import net.iskaa303.simpleportals.registry.SimplePortalsItems;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -11,7 +11,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
-import java.text.DecimalFormat;
 
 /**
  * Renders the control hints and cursor coordinates on the HUD
@@ -19,10 +18,7 @@ import java.text.DecimalFormat;
  */
 public final class ControlsOverlay {
 
-    private static final DecimalFormat FMT = new DecimalFormat("#.##");
-
     private ControlsOverlay() {}
-
     public static void render(GuiGraphics guiGraphics) {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
@@ -46,9 +42,10 @@ public final class ControlsOverlay {
 
         Vec3 target = TargetSelector.getCurrentTarget();
         if (target != null) {
-            String coordLine = "§fX: " + FMT.format(target.x)
-                    + "  Y: " + FMT.format(target.y)
-                    + "  Z: " + FMT.format(target.z);
+            String fmt = "§fX: %." + SimplePortalsConfig.dotPrecision + "f"
+                    + "  Y: %." + SimplePortalsConfig.dotPrecision + "f"
+                    + "  Z: %." + SimplePortalsConfig.dotPrecision + "f";
+            String coordLine = String.format(fmt, target.x, target.y, target.z);
             String[] tmp = new String[lines.length + 1];
             System.arraycopy(lines, 0, tmp, 0, lines.length);
             tmp[lines.length] = coordLine;
@@ -64,7 +61,7 @@ public final class ControlsOverlay {
         int lineH = font.lineHeight;
         int totalH = lines.length * lineH;
 
-        OverlayPosition pos = ConfigData.get().overlayPosition;
+        OverlayPosition pos = SimplePortalsConfig.overlayPosition;
         int x = pos.getX(screenW, textW);
         int y = pos.getY(screenH, totalH);
 

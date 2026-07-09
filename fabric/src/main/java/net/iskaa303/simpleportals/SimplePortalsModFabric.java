@@ -1,13 +1,13 @@
 package net.iskaa303.simpleportals;
 
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.loader.api.FabricLoader;
-import net.iskaa303.simpleportals.config.ConfigData;
+import net.iskaa303.simpleportals.config.SimplePortalsConfig;
+import net.iskaa303.simpleportals.platform.SimplePortalsAgnos;
 
 public class SimplePortalsModFabric implements ModInitializer {
     @Override
     public void onInitialize() {
-        ConfigData.load(FabricLoader.getInstance().getConfigDir());
+        SimplePortalsConfig.load(SimplePortalsAgnos.getConfigDirectory());
         SimplePortalsMod.init();
     }
 }
