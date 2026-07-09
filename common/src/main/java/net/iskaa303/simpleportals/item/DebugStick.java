@@ -5,7 +5,7 @@ import java.util.List;
 
 import javax.annotation.Nonnull;
 
-import net.iskaa303.simpleportals.client.render.SelectionInterfaceRenderer;
+import net.iskaa303.simpleportals.client.targeting.TargetSelector;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -34,7 +34,7 @@ public class DebugStick extends Item {
         if (stack == null) return null;
         
         if (!level.isClientSide) {
-            Vec3 target = SelectionInterfaceRenderer.getCurrentTarget();
+            Vec3 target = TargetSelector.getCurrentTarget();
             if (target == null) return InteractionResultHolder.pass(stack);
             togglePoint(stack, player, target);
         }
