@@ -3,7 +3,9 @@ package net.iskaa303.simpleportals;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.iskaa303.simpleportals.client.gui.ControlsOverlay;
 import net.iskaa303.simpleportals.client.render.SelectionInterfaceRenderer;
 
 public class SimplePortalsModFabricClient implements ClientModInitializer {
@@ -15,5 +17,7 @@ public class SimplePortalsModFabricClient implements ClientModInitializer {
             float partialTicks = context.tickCounter().getGameTimeDeltaTicks();
             SelectionInterfaceRenderer.render(poseStack, partialTicks);
         });
+
+        HudRenderCallback.EVENT.register((guiGraphics, deltaTracker) -> ControlsOverlay.render(guiGraphics));
     }
 }

@@ -33,7 +33,7 @@ public class SelectionInterfaceRenderer {
         LocalPlayer player = mc.player;
         if (player == null || mc.level == null) return;
 
-        var stick = SimplePortalsItems.DEBUG_STICK.get();
+        var stick = SimplePortalsItems.PORTAL_STICK.get();
         if (stick == null) return;
         ItemStack stickStack = player.getMainHandItem().is(stick) ? player.getMainHandItem() : player.getOffhandItem();
         if (!stickStack.is(stick)) return;
@@ -47,7 +47,7 @@ public class SelectionInterfaceRenderer {
         BlockHitResult hitResult = TargetSelector.getLastHitResult();
 
         // Resolve the Veil render type for this interface
-        RenderType renderType = VeilRenderType.get(SELECTION_INTERFACE_RENDER_TYPE, "simpleportals:item/debug_stick");
+        RenderType renderType = VeilRenderType.get(SELECTION_INTERFACE_RENDER_TYPE, "simpleportals:item/portal_stick");
         if (renderType == null) {
             Constants.LOG.error("Failed to get RenderType for selection interface", SELECTION_INTERFACE_RENDER_TYPE);
             return;

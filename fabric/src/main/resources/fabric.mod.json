@@ -20,6 +20,9 @@
         ],
         "client": [
             "net.iskaa303.simpleportals.SimplePortalsModFabricClient"
+        ],
+        "modmenu": [
+            "net.iskaa303.simpleportals.SimplePortalsModMenuIntegration"
         ]
     },
     "mixins": [
@@ -36,4 +39,3 @@
         "another-mod": "*"
     }
 }
-  

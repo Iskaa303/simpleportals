@@ -2,7 +2,7 @@ package net.iskaa303.simpleportals.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.iskaa303.simpleportals.item.DebugStick;
+import net.iskaa303.simpleportals.item.PortalStick;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.item.ItemStack;
@@ -24,7 +24,7 @@ public final class SavedPointsRenderer {
     private SavedPointsRenderer() {}
 
     public static void render(@Nonnull PoseStack ps, ItemStack stickStack, VertexConsumer builder) {
-        List<Vec3> points = DebugStick.getPoints(stickStack);
+        List<Vec3> points = PortalStick.getPoints(stickStack);
         if (points.isEmpty()) return;
 
         float h = (float) (RenderConstants.BOX_SIZE / 2.0);

@@ -80,13 +80,13 @@ public final class TargetSelector {
 
     @SuppressWarnings("DataFlowIssue")
     private static List<Vec3> getSavedPoints(LocalPlayer player) {
-        var stick = net.iskaa303.simpleportals.registry.SimplePortalsItems.DEBUG_STICK.get();
+        var stick = net.iskaa303.simpleportals.registry.SimplePortalsItems.PORTAL_STICK.get();
         if (stick == null) return null;
         var mainStack = player.getMainHandItem();
         var offStack = player.getOffhandItem();
         var stickStack = mainStack.is(stick) ? mainStack : offStack;
         if (!stickStack.is(stick)) return null;
-        return net.iskaa303.simpleportals.item.DebugStick.getPoints(stickStack);
+        return net.iskaa303.simpleportals.item.PortalStick.getPoints(stickStack);
     }
 
     private static Vec3 snapToGrid(@Nonnull Vec3 pos) {
