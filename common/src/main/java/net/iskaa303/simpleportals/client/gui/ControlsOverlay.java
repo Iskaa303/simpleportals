@@ -24,13 +24,15 @@ public final class ControlsOverlay {
 
         var pointStick = SimplePortalsItems.POINT_STICK.get();
         var connStick = SimplePortalsItems.CONNECTION_STICK.get();
-        if (pointStick == null && connStick == null) return;
+        var surfStick = SimplePortalsItems.SURFACE_STICK.get();
+        if (pointStick == null && connStick == null && surfStick == null) return;
 
         ItemStack main = player.getMainHandItem();
         ItemStack off = player.getOffhandItem();
         boolean hasPointStick = pointStick != null && (main.is(pointStick) || off.is(pointStick));
         boolean hasConnStick = connStick != null && (main.is(connStick) || off.is(connStick));
-        if (!hasPointStick && !hasConnStick) return;
+        boolean hasSurfStick = surfStick != null && (main.is(surfStick) || off.is(surfStick));
+        if (!hasPointStick && !hasConnStick && !hasSurfStick) return;
 
         Font font = mc.font;
         int screenW = mc.getWindow().getGuiScaledWidth();
@@ -41,6 +43,11 @@ public final class ControlsOverlay {
             lines = new String[]{
                     Component.translatable("controls.simpleportals.connection_stick.line1").getString(),
                     Component.translatable("controls.simpleportals.connection_stick.line2").getString()
+            };
+        } else if (hasSurfStick) {
+            lines = new String[]{
+                    Component.translatable("controls.simpleportals.surface_stick.line1").getString(),
+                    Component.translatable("controls.simpleportals.surface_stick.line2").getString()
             };
         } else {
             lines = new String[]{

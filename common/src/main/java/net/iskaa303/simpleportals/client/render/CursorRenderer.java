@@ -6,8 +6,9 @@ import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.List;
 
-/** Renders the cursor wireframe box. Stretched prism when connection-snapped. */
+/** Renders the cursor wireframe box. Stretched prism when connection-snapped. Polygon highlight when surface-snapped. */
 public final class CursorRenderer {
 
     private static final int[][] EDGES = {
@@ -19,8 +20,11 @@ public final class CursorRenderer {
     private CursorRenderer() {}
 
     public static void render(@Nonnull PoseStack ps, @Nonnull Vec3 camPos, Vec3 pos,
-                              VertexConsumer builder, @Nullable Vec3[] connectionEndpoints) {
-        if (connectionEndpoints != null && connectionEndpoints.length == 2) {
+                              VertexConsumer builder, @Nullable Vec3[] connectionEndpoints,
+                              @Nullable List<Vec3> surfaceVertices) {
+        if (surfaceVertices != null && surfaceVertices.size() >= 3) {
+            renderSurfaceHighlight(ps, camPos, builder, surfaceVertices);
+        } else if (connectionEndpoints != null && connectionEndpoints.length == 2) {
             renderStretchedBox(ps, camPos, builder, connectionEndpoints[0], connectionEndpoints[1]);
         } else {
             renderSingleBox(ps, camPos, pos, builder);
@@ -75,6 +79,33 @@ public final class CursorRenderer {
         for (int[] e : stretchEdges) {
             Vec3 normal = corners[e[0]].subtract(center).normalize();
             RenderUtils.renderLine(ps, builder, corners[e[0]], corners[e[1]], 0.8f, normal, camPos);
+        }
+    }
+
+    /**
+     * Render a wireframe highlight around the surface polygon, shaped like a Minecraft block highlight.
+     * The polygon is offset slightly along its normal for the highlight look.
+     */
+    private static void renderSurfaceHighlight(@Nonnull PoseStack ps, @Nonnull Vec3 camPos,
+                                               VertexConsumer builder, @Nonnull List<Vec3> verts) {
+        int n = verts.size();
+        if (n < 3) return;
+
+        // Compute polygon normal from first three vertices
+        Vec3 v0 = verts.get(0);
+        Vec3 v1 = verts.get(1);
+        Vec3 v2 = verts.get(2);
+        Vec3 normal = v1.subtract(v0).cross(v2.subtract(v0)).normalize();
+        if (normal == null) normal = new Vec3(0, 1, 0);
+
+        // ponytail: single wireframe offset slightly above the surface, same visual style as the normal cursor
+        double offset = 0.003;
+        Vec3 shift = normal.scale(offset);
+        for (int i = 0; i < n; i++) {
+            Vec3 a = verts.get(i).add(shift);
+            Vec3 b = verts.get((i + 1) % n).add(shift);
+            Vec3 edgeNormal = a.subtract(b).normalize();
+            RenderUtils.renderLine(ps, builder, a, b, 1.0f, edgeNormal, camPos, 2.0);
         }
     }
 }

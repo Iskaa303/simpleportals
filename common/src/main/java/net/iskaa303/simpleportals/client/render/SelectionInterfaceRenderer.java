@@ -32,13 +32,15 @@ public class SelectionInterfaceRenderer {
 
         var pointStick = SimplePortalsItems.POINT_STICK.get();
         var connStick = SimplePortalsItems.CONNECTION_STICK.get();
-        if (pointStick == null && connStick == null) return;
+        var surfStick = SimplePortalsItems.SURFACE_STICK.get();
+        if (pointStick == null && connStick == null && surfStick == null) return;
 
         ItemStack main = player.getMainHandItem();
         ItemStack off = player.getOffhandItem();
         boolean hasPointStick = (pointStick != null && (main.is(pointStick) || off.is(pointStick)));
         boolean hasConnStick = (connStick != null && (main.is(connStick) || off.is(connStick)));
-        if (!hasPointStick && !hasConnStick) return;
+        boolean hasSurfStick = (surfStick != null && (main.is(surfStick) || off.is(surfStick)));
+        if (!hasPointStick && !hasConnStick && !hasSurfStick) return;
 
         Camera camera = mc.gameRenderer.getMainCamera();
         Vec3 eyePos = camera.getPosition();
@@ -60,17 +62,20 @@ public class SelectionInterfaceRenderer {
         poseStack.translate(-eyePos.x, -eyePos.y, -eyePos.z);
 
         Vec3[] connEndpoints = TargetSelector.getSnappedConnectionEndpoints();
-
+        Vec3[] surfEndpoints = TargetSelector.getSnappedSurfaceEndpoints();
         // Grid: hide when snapping to points (Ctrl) or connections (Shift + Connection Stick)
         boolean showGrid = !net.minecraft.client.gui.screens.Screen.hasControlDown()
-                && !(player.isShiftKeyDown() && hasConnStick);
+                && !(player.isShiftKeyDown() && (hasConnStick || hasSurfStick));
         if (showGrid) {
             GridRenderer.render(poseStack, eyePos, player.getViewVector(partialTicks),
                     hitResult, targetPos, builder);
         }
-        CursorRenderer.render(poseStack, eyePos, targetPos, builder, connEndpoints);
+        Vec3[] cursorEndpoints = connEndpoints != null ? connEndpoints : surfEndpoints;
+        CursorRenderer.render(poseStack, eyePos, targetPos, builder, cursorEndpoints, TargetSelector.getSnappedSurfaceVertices());
         SavedPointsRenderer.render(poseStack, player, builder, eyePos);
-
+        if (hasSurfStick) {
+            SurfaceRenderer.render(poseStack, player, builder, eyePos);
+        }
         mc.renderBuffers().bufferSource().endBatch(renderType);
         poseStack.popPose();
     }

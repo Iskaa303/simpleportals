@@ -1,8 +1,21 @@
 {
     "item.simpleportals.point_stick": "Point Stick",
     "item.simpleportals.connection_stick": "Connection Stick",
+    "item.simpleportals.surface_stick": "Surface Stick",
     "controls.simpleportals.point_stick.line1": "§fRight Click: Create/Delete Point",
     "controls.simpleportals.point_stick.line2": "§fShift: Snap to Grid   §fCtrl: Snap to Point",
     "controls.simpleportals.connection_stick.line1": "§fRight Click: Select Endpoint / Create Connection",
-    "controls.simpleportals.connection_stick.line2": "§fShift: Snap to Connection   §fCtrl: Snap to Point"
+    "controls.simpleportals.connection_stick.line2": "§fShift: Snap to Connection   §fCtrl: Snap to Point",
+    "controls.simpleportals.surface_stick.line1": "§fRight Click: Create Surface from closed loop",
+    "controls.simpleportals.surface_stick.line2": "§fShift: Snap to Surface   §fCtrl: Snap to Point",
+    "message.simpleportals.point_created": "§bPoint Created",
+    "message.simpleportals.point_removed": "§cPoint Removed",
+    "message.simpleportals.connection_created": "§aConnection created",
+    "message.simpleportals.connection_removed": "§cConnection removed",
+    "message.simpleportals.endpoint_selected": "§eEndpoint selected",
+    "message.simpleportals.endpoint_deselected": "§cEndpoint deselected",
+    "message.simpleportals.no_point_at_cursor": "§7No point at cursor — use Point Stick to create one",
+    "message.simpleportals.surface_created": "§aSurface created, points consumed",
+    "message.simpleportals.surface_removed": "§cSurface removed",
+    "message.simpleportals.no_loop_found": "§7No closed loop found at this point"
 }

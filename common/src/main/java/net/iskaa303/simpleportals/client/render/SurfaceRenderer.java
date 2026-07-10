@@ -1,0 +1,94 @@
+package net.iskaa303.simpleportals.client.render;
+
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.iskaa303.simpleportals.client.targeting.TargetSelector;
+import net.iskaa303.simpleportals.item.PointDataStore;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
+
+import javax.annotation.Nonnull;
+import java.util.List;
+
+/** Renders saved surfaces and the preview surface as semi-transparent polygons. */
+public final class SurfaceRenderer {
+
+    // Saved surface: dark magenta fill + bright outline
+    private static final float[] SURFACE_FILL = {0.8f, 0.2f, 0.7f, 0.30f};
+    private static final float[] SURFACE_OUTLINE = {1.0f, 0.4f, 0.9f, 0.6f};
+    // Preview (would-be) surface: lighter, more transparent
+    private static final float[] PREVIEW_FILL = {0.9f, 0.4f, 0.8f, 0.18f};
+    private static final float[] PREVIEW_OUTLINE = {1.0f, 0.6f, 0.9f, 0.4f};
+
+    private SurfaceRenderer() {}
+
+    public static void render(@Nonnull PoseStack ps, @Nonnull Player player,
+                              VertexConsumer builder, @Nonnull Vec3 camPos) {
+        // Render saved surfaces
+        ListTag surfaces = PointDataStore.getSurfaces(player);
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag surf = surfaces.getCompound(i);
+            List<Vec3> verts = PointDataStore.getSurfacePositions(player, surf);
+            if (verts.size() < 3) continue;
+            renderPolygon(ps, builder, verts, SURFACE_FILL, SURFACE_OUTLINE, camPos);
+        }
+
+        // Render preview surface (when holding Surface Stick, cursor on a point with a cycle)
+        List<Vec3> previewVerts = TargetSelector.getPreviewSurfaceVertices();
+        if (previewVerts != null && previewVerts.size() >= 3) {
+            renderPolygon(ps, builder, previewVerts, PREVIEW_FILL, PREVIEW_OUTLINE, camPos);
+        }
+    }
+
+    /**
+     * Render a filled polygon (fan from first vertex) with wireframe outline.
+     */
+    private static void renderPolygon(@Nonnull PoseStack ps, VertexConsumer b,
+                                      @Nonnull List<Vec3> verts,
+                                      float[] fillColor, float[] outlineColor,
+                                      @Nonnull Vec3 camPos) {
+        PoseStack.Pose last = ps.last();
+        if (last == null) return;
+
+        int n = verts.size();
+        if (n < 3) return;
+
+        // ponytail: fan triangulation from v0, works for convex cycles, add ear-clip if concave cycles appear
+        Vec3 v0 = verts.get(0);
+        for (int i = 1; i < n - 1; i++) {
+            Vec3 v1 = verts.get(i);
+            Vec3 v2 = verts.get(i + 1);
+
+            // ponytail: render triangle twice (both windings) so both sides visible regardless of culling
+            // Front face: v0,v1,v2
+            b.addVertex(last, (float) v0.x, (float) v0.y, (float) v0.z)
+                    .setColor(fillColor[0], fillColor[1], fillColor[2], fillColor[3]);
+            b.addVertex(last, (float) v1.x, (float) v1.y, (float) v1.z)
+                    .setColor(fillColor[0], fillColor[1], fillColor[2], fillColor[3]);
+            b.addVertex(last, (float) v2.x, (float) v2.y, (float) v2.z)
+                    .setColor(fillColor[0], fillColor[1], fillColor[2], fillColor[3]);
+            b.addVertex(last, (float) v2.x, (float) v2.y, (float) v2.z)
+                    .setColor(fillColor[0], fillColor[1], fillColor[2], fillColor[3]);
+            // Back face: v2,v1,v0 (reversed winding)
+            b.addVertex(last, (float) v2.x, (float) v2.y, (float) v2.z)
+                    .setColor(fillColor[0], fillColor[1], fillColor[2], fillColor[3]);
+            b.addVertex(last, (float) v1.x, (float) v1.y, (float) v1.z)
+                    .setColor(fillColor[0], fillColor[1], fillColor[2], fillColor[3]);
+            b.addVertex(last, (float) v0.x, (float) v0.y, (float) v0.z)
+                    .setColor(fillColor[0], fillColor[1], fillColor[2], fillColor[3]);
+            b.addVertex(last, (float) v0.x, (float) v0.y, (float) v0.z)
+                    .setColor(fillColor[0], fillColor[1], fillColor[2], fillColor[3]);
+        }
+
+        // Wireframe outline
+        for (int i = 0; i < n; i++) {
+            Vec3 a = verts.get(i);
+            Vec3 b2 = verts.get((i + 1) % n);
+            Vec3 normal = a.subtract(b2).normalize();
+            RenderUtils.renderLine(ps, b, a, b2, outlineColor[3], normal, camPos, 1.5);
+        }
+    }
+}

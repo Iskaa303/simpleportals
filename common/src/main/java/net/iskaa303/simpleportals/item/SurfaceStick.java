@@ -14,11 +14,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.List;
 
-/** Connection Stick — manages connections between points. Data is per-player, no extra items needed. */
-public class ConnectionStick extends Item {
+/** Surface Stick — creates/deletes surfaces from closed loops in the connection graph. */
+public class SurfaceStick extends Item {
 
-    public ConnectionStick(Properties properties) {
+    public SurfaceStick(Properties properties) {
         super(properties);
     }
 
@@ -31,11 +33,11 @@ public class ConnectionStick extends Item {
             Vec3 target = TargetSelector.getCurrentTarget();
             if (target == null) return InteractionResultHolder.pass(stack);
 
-            // If snapped to a connection (Shift held), delete it on click
-            String[] snappedConn = TargetSelector.getSnappedConnectionUuids();
-            if (snappedConn != null) {
-                PointDataStore.removeConnection(player, snappedConn[0], snappedConn[1]);
-                player.displayClientMessage(Component.translatable("message.simpleportals.connection_removed"), true);
+            // If snapped to a surface edge (Shift held), delete it on click
+            String snappedSurfaceId = TargetSelector.getSnappedSurfaceId();
+            if (snappedSurfaceId != null) {
+                PointDataStore.removeSurface(player, snappedSurfaceId);
+                player.displayClientMessage(Component.translatable("message.simpleportals.surface_removed"), true);
                 return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
             }
 
@@ -45,26 +47,20 @@ public class ConnectionStick extends Item {
                 return InteractionResultHolder.pass(stack);
             }
 
-            String selectedUuid = PointDataStore.getSelectedEndpoint(player);
-
-            if (selectedUuid.isEmpty()) {
-                PointDataStore.setSelectedEndpoint(player, pointUuid);
-                player.displayClientMessage(Component.translatable("message.simpleportals.endpoint_selected"), true);
-            } else if (selectedUuid.equals(pointUuid)) {
-                PointDataStore.setSelectedEndpoint(player, null);
-                player.displayClientMessage(Component.translatable("message.simpleportals.endpoint_deselected"), true);
-            } else {
-                if (PointDataStore.hasConnection(player, selectedUuid, pointUuid)) {
-                    PointDataStore.removeConnection(player, selectedUuid, pointUuid);
-                    player.displayClientMessage(Component.translatable("message.simpleportals.connection_removed"), true);
-                } else {
-                    PointDataStore.addConnection(player, selectedUuid, pointUuid);
-                    player.displayClientMessage(Component.translatable("message.simpleportals.connection_created"), true);
-                }
-                PointDataStore.setSelectedEndpoint(player, null);
+            List<String> cycle = PointDataStore.findSmallestCycleContaining(player, pointUuid);
+            if (cycle == null || cycle.size() < 3) {
+                player.displayClientMessage(Component.translatable("message.simpleportals.no_loop_found"), true);
+                return InteractionResultHolder.pass(stack);
             }
-        }
 
+            PointDataStore.addSurface(player, cycle);
+            // ponytail: consume the cycle connections, leave points intact for reuse
+            int n = cycle.size();
+            for (int i = 0; i < n; i++) {
+                PointDataStore.removeConnection(player, cycle.get(i), cycle.get((i + 1) % n));
+            }
+            player.displayClientMessage(Component.translatable("message.simpleportals.surface_created"), true);
+        }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
     }
 

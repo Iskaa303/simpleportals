@@ -32,7 +32,13 @@ public final class TargetSelector {
     private static Vec3 snappedConnectionB;
     private static String snappedConnectionUuidA;
     private static String snappedConnectionUuidB;
-
+    // Surface snap
+    private static String snappedSurfaceId;
+    private static Vec3 snappedSurfaceA;
+    private static Vec3 snappedSurfaceB;
+    private static List<Vec3> snappedSurfaceVertices;
+    // Preview surface vertices (Surface Stick cursor on point with cycle)
+    private static List<Vec3> previewSurfaceVerts;
     private TargetSelector() {}
 
     public static Vec3 getTarget(@Nonnull LocalPlayer player, @Nonnull Camera camera, float partialTicks) {
@@ -56,21 +62,32 @@ public final class TargetSelector {
         snappedConnectionB = null;
         snappedConnectionUuidA = null;
         snappedConnectionUuidB = null;
-
+        snappedSurfaceId = null;
+        snappedSurfaceA = null;
+        snappedSurfaceB = null;
+        snappedSurfaceVertices = null;
+        previewSurfaceVerts = null;
         boolean isConnectionStick = isHoldingConnectionStick(player);
+        boolean isSurfaceStick = isHoldingSurfaceStick(player);
         List<Vec3> savedPoints = getSavedPoints(player);
-
         if (Screen.hasControlDown() && savedPoints != null && !savedPoints.isEmpty()) {
             Vec3 nearest = getNearestPoint(targetPos, savedPoints);
             if (nearest != null) targetPos = nearest;
         } else if (player.isShiftKeyDown()) {
-            if (isConnectionStick && savedPoints != null && !savedPoints.isEmpty()) {
+            if (isSurfaceStick && savedPoints != null && !savedPoints.isEmpty()) {
+                targetPos = snapToNearestSurface(player, targetPos);
+            } else if (isConnectionStick && savedPoints != null && !savedPoints.isEmpty()) {
                 targetPos = snapToNearestConnection(player, targetPos);
             } else {
                 targetPos = hitResult.getType() != HitResult.Type.MISS
                         ? snapToSurface(hitResult)
                         : snapToGrid(targetPos);
             }
+        }
+
+        // Compute preview surface if cursor is on a point and holding surface stick
+        if (isSurfaceStick) {
+            computePreviewSurface(player, targetPos);
         }
 
         boolean shouldSmooth = player.isShiftKeyDown() || Screen.hasControlDown();
@@ -99,6 +116,30 @@ public final class TargetSelector {
         return new String[]{snappedConnectionUuidA, snappedConnectionUuidB};
     }
 
+    @Nullable
+    public static String getSnappedSurfaceId() {
+        return snappedSurfaceId;
+    }
+
+    /** If cursor is snapped to a surface edge, returns the two endpoint positions. */
+    @Nullable
+    public static Vec3[] getSnappedSurfaceEndpoints() {
+        if (snappedSurfaceA == null || snappedSurfaceB == null) return null;
+        return new Vec3[]{snappedSurfaceA, snappedSurfaceB};
+    }
+
+    @Nullable
+    public static List<Vec3> getSnappedSurfaceVertices() {
+        return snappedSurfaceVertices;
+    }
+
+    @Nullable
+    public static List<Vec3> getPreviewSurfaceVertices() {
+        return previewSurfaceVerts;
+    }
+
+    // ─── Helpers ───
+
     // ─── Helpers ───
 
     private static boolean isHoldingConnectionStick(LocalPlayer player) {
@@ -107,11 +148,19 @@ public final class TargetSelector {
         return player.getMainHandItem().is(connStick) || player.getOffhandItem().is(connStick);
     }
 
+    private static boolean isHoldingSurfaceStick(LocalPlayer player) {
+        var surfStick = SimplePortalsItems.SURFACE_STICK.get();
+        if (surfStick == null) return false;
+        return player.getMainHandItem().is(surfStick) || player.getOffhandItem().is(surfStick);
+    }
+
     private static List<Vec3> getSavedPoints(LocalPlayer player) {
         var pointStick = SimplePortalsItems.POINT_STICK.get();
         var connStick = SimplePortalsItems.CONNECTION_STICK.get();
+        var surfStick = SimplePortalsItems.SURFACE_STICK.get();
         boolean hasStick = (pointStick != null && (player.getMainHandItem().is(pointStick) || player.getOffhandItem().is(pointStick)))
-                || (connStick != null && (player.getMainHandItem().is(connStick) || player.getOffhandItem().is(connStick)));
+                || (connStick != null && (player.getMainHandItem().is(connStick) || player.getOffhandItem().is(connStick)))
+                || (surfStick != null && (player.getMainHandItem().is(surfStick) || player.getOffhandItem().is(surfStick)));
         if (!hasStick) return null;
         return PointDataStore.getPoints(player);
     }
@@ -188,14 +237,70 @@ public final class TargetSelector {
         return pos;
     }
 
-    /** Closest point on segment AB to P. */
-    private static Vec3 closestPointOnSegment(@Nonnull Vec3 p, @Nonnull Vec3 a, @Nonnull Vec3 b) {
-        Vec3 ab = b.subtract(a);
-        double lenSqr = ab.lengthSqr();
-        if (lenSqr < 1e-10) return a;
-        double t = p.subtract(a).dot(ab) / lenSqr;
-        t = Mth.clamp(t, 0.0, 1.0);
-        return a.add(ab.scale(t));
+    /** Snap to nearest surface edge segment, store endpoints for stretched cursor. */
+    private static Vec3 snapToNearestSurface(@Nonnull LocalPlayer player, @Nonnull Vec3 pos) {
+        ListTag surfaces = PointDataStore.getSurfaces(player);
+        Vec3 bestPoint = null;
+        String bestSurfaceId = null;
+        Vec3 bestA = null;
+        Vec3 bestB = null;
+        double bestDistSqr = Double.MAX_VALUE;
+
+        for (int s = 0; s < surfaces.size(); s++) {
+            CompoundTag surf = surfaces.getCompound(s);
+            String surfId = surf.getString("surface_id");
+            ListTag ptUuids = surf.getList("points", Tag.TAG_STRING);
+            int n = ptUuids.size();
+            if (n < 2) continue;
+            for (int i = 0; i < n; i++) {
+                String uuidA = ptUuids.getString(i);
+                String uuidB = ptUuids.getString((i + 1) % n);
+                Vec3 a = PointDataStore.getPointPosByUuid(player, uuidA);
+                Vec3 b = PointDataStore.getPointPosByUuid(player, uuidB);
+                if (a == null || b == null) continue;
+
+                Vec3 closest = closestPointOnSegment(pos, a, b);
+                double distSqr = pos.distanceToSqr(closest);
+                if (distSqr < bestDistSqr) {
+                    bestDistSqr = distSqr;
+                    bestPoint = closest;
+                    bestSurfaceId = surfId;
+                    bestA = a;
+                    bestB = b;
+                }
+            }
+        }
+
+        if (bestPoint != null) {
+            // Store full polygon vertices for the surface highlight
+            List<Vec3> fullVerts = new java.util.ArrayList<>();
+            for (int s2 = 0; s2 < surfaces.size(); s2++) {
+                CompoundTag check = surfaces.getCompound(s2);
+                if (check.getString("surface_id").equals(bestSurfaceId)) {
+                    ListTag ptUuids = check.getList("points", Tag.TAG_STRING);
+                    for (int k = 0; k < ptUuids.size(); k++) {
+                        Vec3 p = PointDataStore.getPointPosByUuid(player, ptUuids.getString(k));
+                        if (p != null) fullVerts.add(p);
+                    }
+                    break;
+                }
+            }
+            snappedSurfaceVertices = fullVerts;
+            snappedSurfaceId = bestSurfaceId;
+            snappedSurfaceA = bestA;
+            snappedSurfaceB = bestB;
+            return bestPoint;
+        }
+        return pos;
+    }
+
+    /** Compute preview surface for the point at (or nearest to) the cursor. */
+    private static void computePreviewSurface(@Nonnull LocalPlayer player, @Nonnull Vec3 targetPos) {
+        String pointUuid = PointDataStore.findPointUuid(player, targetPos);
+        if (pointUuid == null) return;
+        List<String> cycle = PointDataStore.findSmallestCycleContaining(player, pointUuid);
+        if (cycle == null || cycle.size() < 3) return;
+        previewSurfaceVerts = PointDataStore.getPositionsByUuids(player, cycle);
     }
 
     private static CompoundTag findTagByUuid(@Nonnull ListTag list, @Nonnull String uuid) {
@@ -226,5 +331,15 @@ public final class TargetSelector {
             }
         }
         return nearest;
+    }
+
+    /** Closest point on segment AB to P. */
+    private static Vec3 closestPointOnSegment(@Nonnull Vec3 p, @Nonnull Vec3 a, @Nonnull Vec3 b) {
+        Vec3 ab = b.subtract(a);
+        double lenSqr = ab.lengthSqr();
+        if (lenSqr < 1e-10) return a;
+        double t = p.subtract(a).dot(ab) / lenSqr;
+        t = Mth.clamp(t, 0.0, 1.0);
+        return a.add(ab.scale(t));
     }
 }
