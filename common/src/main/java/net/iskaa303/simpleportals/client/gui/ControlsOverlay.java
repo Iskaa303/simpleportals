@@ -28,6 +28,12 @@ public final class ControlsOverlay {
         Player player = mc.player;
         if (player == null) return;
 
+        var stick = SimplePortalsItems.PORTAL_STICK.get();
+        if (stick == null) return;
+        ItemStack main = player.getMainHandItem();
+        ItemStack off = player.getOffhandItem();
+        if (!main.is(stick) && !off.is(stick)) return;
+
         Font font = mc.font;
         int screenW = mc.getWindow().getGuiScaledWidth();
         int screenH = mc.getWindow().getGuiScaledHeight();
@@ -69,6 +75,13 @@ public final class ControlsOverlay {
         } else {
             lines.add(Component.translatable("controls.simpleportals.portal_stick.action").getString());
             lines.add(Component.translatable("controls.simpleportals.portal_stick.drag_hint").getString());
+        }
+
+        // Surface transform hints
+        String copyKey = SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getCopySurface()).getString();
+        String connectKey = SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getConnectSurface()).getString();
+        if (SurfaceTransformController.isNearSurface()) {
+            lines.add("§7[" + copyKey + "] Copy   [" + connectKey + "] Connect");
         }
 
         // Coordinates

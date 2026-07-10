@@ -10,6 +10,8 @@
     "key.simpleportals.snap_grid": "Snap to Grid/Surface/Connection",
     "key.simpleportals.snap_point": "Snap to Existing Point",
     "key.simpleportals.toggle_grid": "Toggle Grid Visibility",
+    "key.simpleportals.copy_surface": "Copy Surface",
+    "key.simpleportals.connect_surface": "Connect/Disconnect Surface",
     "key.simpleportals.unbound": "None",
 
     "config.simpleportals.keys": "Keybindings",
@@ -17,6 +19,8 @@
     "config.simpleportals.keySnapGrid": "Snap Grid",
     "config.simpleportals.keySnapPoint": "Snap Point",
     "config.simpleportals.keyToggleGrid": "Toggle Grid",
+    "config.simpleportals.keyCopySurface": "Copy Surface",
+    "config.simpleportals.keyConnectSurface": "Connect Surface",
 
     "controls.simpleportals.portal_stick.mode": "§6Mode: %s",
     "controls.simpleportals.portal_stick.controls": "§7[%s] Wheel   [%s] Snap   [%s] Point Snap",
@@ -25,6 +29,7 @@
     "controls.simpleportals.portal_stick.drag_hint": "§7Left Click: Drag element under cursor",
     "controls.simpleportals.portal_stick.dragging": "§eDragging %s",
     "controls.simpleportals.portal_stick.place_hint": "§eLeft Click: Place here   Right Click: Cancel",
+
     "message.simpleportals.point_created": "§bPoint Created",
     "message.simpleportals.point_removed": "§cPoint Removed",
     "message.simpleportals.connection_created": "§aConnection created",
@@ -32,8 +37,13 @@
     "message.simpleportals.endpoint_selected": "§eEndpoint selected",
     "message.simpleportals.endpoint_deselected": "§cEndpoint deselected",
     "message.simpleportals.no_point_at_cursor": "§7No point at cursor — use Portal Stick to create one",
-    "message.simpleportals.surface_created": "§aSurface created, points consumed",
+    "message.simpleportals.surface_created": "§aSurface created",
     "message.simpleportals.surface_removed": "§cSurface removed",
     "message.simpleportals.no_loop_found": "§7No closed loop found at this point",
-    "message.simpleportals.mode_changed": "§aSwitched to %s"
+    "message.simpleportals.mode_changed": "§aSwitched to %s",
+    "message.simpleportals.surface_copied": "§aSurface copied",
+    "message.simpleportals.surface_connected": "§aSurfaces connected",
+    "message.simpleportals.surface_disconnected": "§cSurfaces disconnected",
+    "message.simpleportals.no_surface_nearby": "§7No nearby surface to connect",
+    "message.simpleportals.surface_shape_mismatch": "§cSurfaces must have same number of points to connect"
 }

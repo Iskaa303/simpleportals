@@ -56,6 +56,12 @@ public class SimplePortalsConfig {
                         case "keyToggleGrid" -> {
                             try { SimplePortalsKeybinds.setToggleGrid(Integer.parseInt(val)); } catch (NumberFormatException ignored) {}
                         }
+                        case "keyCopySurface" -> {
+                            try { SimplePortalsKeybinds.setCopySurface(Integer.parseInt(val)); } catch (NumberFormatException ignored) {}
+                        }
+                        case "keyConnectSurface" -> {
+                            try { SimplePortalsKeybinds.setConnectSurface(Integer.parseInt(val)); } catch (NumberFormatException ignored) {}
+                        }
                         case "showGrid" -> {
                             showGrid = val.equals("true");
                         }
@@ -92,6 +98,8 @@ public class SimplePortalsConfig {
             sb.append("keySnapGrid = ").append(SimplePortalsKeybinds.getSnapGrid()).append("\n");
             sb.append("keySnapPoint = ").append(SimplePortalsKeybinds.getSnapPoint()).append("\n");
             sb.append("keyToggleGrid = ").append(SimplePortalsKeybinds.getToggleGrid()).append("\n");
+            sb.append("keyCopySurface = ").append(SimplePortalsKeybinds.getCopySurface()).append("\n");
+            sb.append("keyConnectSurface = ").append(SimplePortalsKeybinds.getConnectSurface()).append("\n");
             sb.append("showGrid = ").append(showGrid).append("\n");
             try (BufferedWriter w = Files.newBufferedWriter(file)) {
                 w.write(sb.toString());

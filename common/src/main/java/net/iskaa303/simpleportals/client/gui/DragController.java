@@ -45,6 +45,7 @@ public final class DragController {
 
     // Edge-detection state
     private static boolean wasAttackDown = false;
+    private static boolean wasUseDown = false;
     private static boolean wasToggleGridDown = false;
 
     /** True while a server-side use() call should be suppressed (singleplayer only). */
@@ -95,6 +96,13 @@ public final class DragController {
             }
         }
 
+        // --- Right-click cancels drag ---
+        boolean useDown = mc.options.keyUse.isDown();
+        if (holding && useDown && !wasUseDown && mode != DragMode.NONE) {
+            cancelDrag();
+            shouldCancelUse = true;
+        }
+
         // Update drag positions every tick while actively dragging
         if (mode != DragMode.NONE && holding) {
             updateDrag(player);
@@ -103,6 +111,7 @@ public final class DragController {
         }
 
         wasAttackDown = attackDown;
+        wasUseDown = useDown;
     }
 
     // ─── Start / End / Cancel ───
@@ -183,6 +192,7 @@ public final class DragController {
                 }
             }
         }
+        shouldCancelUse = false;
         clearDrag();
     }
 
@@ -201,7 +211,6 @@ public final class DragController {
         surfacePointUuids.clear();
         originalPositions.clear();
         dragStartTarget = null;
-        shouldCancelUse = false;
     }
 
     // ─── Update ───

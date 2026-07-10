@@ -18,23 +18,31 @@ public final class SimplePortalsKeybinds {
     public static final int DEFAULT_MODE_WHEEL = GLFW.GLFW_KEY_TAB;
     public static final int DEFAULT_SNAP_GRID = GLFW.GLFW_KEY_LEFT_SHIFT;
     public static final int DEFAULT_SNAP_POINT = GLFW.GLFW_KEY_LEFT_CONTROL;
-
     public static final int DEFAULT_TOGGLE_GRID = GLFW.GLFW_KEY_H;
+    public static final int DEFAULT_COPY_SURFACE = GLFW.GLFW_KEY_C;
+    public static final int DEFAULT_CONNECT_SURFACE = GLFW.GLFW_KEY_Z;
+
     // Current (possibly user-modified) key codes — loaded from config
     private static int modeWheel = DEFAULT_MODE_WHEEL;
     private static int snapGrid = DEFAULT_SNAP_GRID;
     private static int snapPoint = DEFAULT_SNAP_POINT;
     private static int toggleGrid = DEFAULT_TOGGLE_GRID;
+    private static int copySurface = DEFAULT_COPY_SURFACE;
+    private static int connectSurface = DEFAULT_CONNECT_SURFACE;
 
     public static int getModeWheel() { return modeWheel; }
     public static int getSnapGrid() { return snapGrid; }
     public static int getSnapPoint() { return snapPoint; }
     public static int getToggleGrid() { return toggleGrid; }
+    public static int getCopySurface() { return copySurface; }
+    public static int getConnectSurface() { return connectSurface; }
 
     public static void setModeWheel(int key) { modeWheel = key; }
     public static void setSnapGrid(int key) { snapGrid = key; }
     public static void setSnapPoint(int key) { snapPoint = key; }
     public static void setToggleGrid(int key) { toggleGrid = key; }
+    public static void setCopySurface(int key) { copySurface = key; }
+    public static void setConnectSurface(int key) { connectSurface = key; }
 
     /** Check if the physical key is pressed right now. */
     public static boolean isDown(int keyCode) {
@@ -52,21 +60,22 @@ public final class SimplePortalsKeybinds {
 
     /** All key codes (for iteration). */
     public static List<Integer> allKeys() {
-        return List.of(modeWheel, snapGrid, snapPoint, toggleGrid);
+        return List.of(modeWheel, snapGrid, snapPoint, toggleGrid, copySurface, connectSurface);
     }
-
 
     /** All default key codes. */
     public static List<Integer> defaultKeys() {
-        return List.of(DEFAULT_MODE_WHEEL, DEFAULT_SNAP_GRID, DEFAULT_SNAP_POINT, DEFAULT_TOGGLE_GRID);
+        return List.of(DEFAULT_MODE_WHEEL, DEFAULT_SNAP_GRID, DEFAULT_SNAP_POINT, DEFAULT_TOGGLE_GRID, DEFAULT_COPY_SURFACE, DEFAULT_CONNECT_SURFACE);
     }
-
 
     public static void resetToDefaults() {
         modeWheel = DEFAULT_MODE_WHEEL;
         snapGrid = DEFAULT_SNAP_GRID;
         snapPoint = DEFAULT_SNAP_POINT;
         toggleGrid = DEFAULT_TOGGLE_GRID;
+        copySurface = DEFAULT_COPY_SURFACE;
+        connectSurface = DEFAULT_CONNECT_SURFACE;
     }
+
     private SimplePortalsKeybinds() {}
 }

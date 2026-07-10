@@ -7,8 +7,6 @@ import net.iskaa303.simpleportals.client.render.RadialMenuRenderer;
 import net.iskaa303.simpleportals.item.PortalStick;
 import net.iskaa303.simpleportals.item.PortalStickMode;
 import net.iskaa303.simpleportals.item.PointDataStore;
-import net.iskaa303.simpleportals.item.PortalStick;
-import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
 import net.iskaa303.simpleportals.client.render.RadialMenuRenderer;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
@@ -111,6 +109,7 @@ public class ModeSelectionOverlay extends RadialMenuRenderer<PortalStickMode> {
     /** Called every client tick to check key states. */
     public static void tick() {
         DragController.tick();
+        SurfaceTransformController.tick();
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
         if (player == null) return;

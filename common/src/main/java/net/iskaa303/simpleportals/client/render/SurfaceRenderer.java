@@ -17,9 +17,6 @@ import java.util.List;
 /** Renders saved surfaces and the preview surface as semi-transparent polygons. */
 public final class SurfaceRenderer {
 
-    // Saved surface: dark magenta fill + bright outline
-    private static final float[] SURFACE_FILL = {0.8f, 0.2f, 0.7f, 0.30f};
-    private static final float[] SURFACE_OUTLINE = {1.0f, 0.4f, 0.9f, 0.6f};
     // Preview (would-be) surface: lighter, more transparent
     private static final float[] PREVIEW_FILL = {0.9f, 0.4f, 0.8f, 0.18f};
     private static final float[] PREVIEW_OUTLINE = {1.0f, 0.6f, 0.9f, 0.4f};
@@ -28,7 +25,7 @@ public final class SurfaceRenderer {
 
     public static void render(@Nonnull PoseStack ps, @Nonnull Player player,
                               VertexConsumer builder, @Nonnull Vec3 camPos) {
-        // Render saved surfaces
+        // Render saved surfaces with per-surface colors
         ListTag surfaces = PointDataStore.getSurfaces(player);
         for (int i = 0; i < surfaces.size(); i++) {
             CompoundTag surf = surfaces.getCompound(i);
@@ -40,8 +37,8 @@ public final class SurfaceRenderer {
                 fill = DragController.DRAG_SURFACE_FILL;
                 outline = DragController.DRAG_SURFACE_OUTLINE;
             } else {
-                fill = SURFACE_FILL;
-                outline = SURFACE_OUTLINE;
+                fill = PointDataStore.getSurfaceFillColor(surf);
+                outline = PointDataStore.getSurfaceOutlineColor(surf);
             }
             renderPolygon(ps, builder, verts, fill, outline, camPos);
         }

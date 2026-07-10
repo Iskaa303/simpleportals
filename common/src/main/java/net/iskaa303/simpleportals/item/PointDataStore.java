@@ -13,6 +13,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -32,10 +33,46 @@ public class PointDataStore {
     private static final String SURFACES_KEY = "surfaces";
     private static final String SURFACE_ID_KEY = "surface_id";
     private static final String SURFACE_POINTS_KEY = "points";
+    private static final String COLOR_R_KEY = "color_r";
+    private static final String COLOR_G_KEY = "color_g";
+    private static final String COLOR_B_KEY = "color_b";
+    private static final String COLOR_A_KEY = "color_a";
+    private static final String CONNECTED_SURFACES_KEY = "connected_surfaces";
     private static final double EPSILON = 0.0001;
     private static final String MODE_KEY = "portal_stick_mode";
 
     private static final Map<UUID, CompoundTag> PLAYER_DATA = new ConcurrentHashMap<>();
+
+    // ─── Color palette ───
+    private static final float[][] SURFACE_COLORS = {
+        {0.8f, 0.2f, 0.7f, 0.30f},  // magenta
+        {0.2f, 0.6f, 1.0f, 0.30f},  // blue
+        {0.2f, 1.0f, 0.5f, 0.30f},  // green
+        {1.0f, 0.8f, 0.2f, 0.30f},  // yellow
+        {1.0f, 0.4f, 0.2f, 0.30f},  // orange
+        {0.6f, 0.2f, 1.0f, 0.30f},  // purple
+        {1.0f, 0.2f, 0.2f, 0.30f},  // red
+        {0.2f, 1.0f, 1.0f, 0.30f},  // cyan
+        {1.0f, 0.6f, 0.8f, 0.30f},  // pink
+        {0.6f, 1.0f, 0.2f, 0.30f},  // lime
+        {0.4f, 0.2f, 0.6f, 0.30f},  // indigo
+        {1.0f, 0.8f, 0.6f, 0.30f},  // peach
+    };
+    private static final float[][] SURFACE_OUTLINES = {
+        {1.0f, 0.4f, 0.9f, 0.6f},   // magenta
+        {0.4f, 0.8f, 1.0f, 0.6f},   // blue
+        {0.4f, 1.0f, 0.7f, 0.6f},   // green
+        {1.0f, 0.9f, 0.4f, 0.6f},   // yellow
+        {1.0f, 0.6f, 0.4f, 0.6f},   // orange
+        {0.8f, 0.4f, 1.0f, 0.6f},   // purple
+        {1.0f, 0.4f, 0.4f, 0.6f},   // red
+        {0.4f, 1.0f, 1.0f, 0.6f},   // cyan
+        {1.0f, 0.7f, 0.9f, 0.6f},   // pink
+        {0.8f, 1.0f, 0.4f, 0.6f},   // lime
+        {0.6f, 0.4f, 0.8f, 0.6f},   // indigo
+        {1.0f, 0.9f, 0.7f, 0.6f},   // peach
+    };
+    private static final Random COLOR_RNG = new Random();
 
     private PointDataStore() {}
 
@@ -199,6 +236,14 @@ public class PointDataStore {
         return new Vec3(tag.getDouble(X_KEY), tag.getDouble(Y_KEY), tag.getDouble(Z_KEY));
     }
 
+    public static void setPointPos(@Nonnull Player player, @Nonnull String uuid, @Nonnull Vec3 pos) {
+        CompoundTag tag = getPointByUuid(player, uuid);
+        if (tag == null) return;
+        tag.putDouble(X_KEY, pos.x);
+        tag.putDouble(Y_KEY, pos.y);
+        tag.putDouble(Z_KEY, pos.z);
+    }
+
     @Nonnull
     public static String getSelectedEndpoint(@Nonnull Player player) {
         CompoundTag data = getData(player);
@@ -262,6 +307,11 @@ public class PointDataStore {
 
     // ─── Surface storage ───
 
+    /** Pick a random color index and assign to a new surface. */
+    private static int pickColorIndex() {
+        return COLOR_RNG.nextInt(SURFACE_COLORS.length);
+    }
+
     public static void addSurface(@Nonnull Player player, @Nonnull List<String> orderedUuids) {
         CompoundTag data = getData(player);
         ListTag surfaces = data.getList(SURFACES_KEY, Tag.TAG_COMPOUND);
@@ -272,6 +322,12 @@ public class PointDataStore {
             pointIds.add(StringTag.valueOf(uuid));
         }
         surf.put(SURFACE_POINTS_KEY, pointIds);
+        int c = pickColorIndex();
+        surf.putFloat(COLOR_R_KEY, SURFACE_COLORS[c][0]);
+        surf.putFloat(COLOR_G_KEY, SURFACE_COLORS[c][1]);
+        surf.putFloat(COLOR_B_KEY, SURFACE_COLORS[c][2]);
+        surf.putFloat(COLOR_A_KEY, SURFACE_COLORS[c][3]);
+        surf.put(CONNECTED_SURFACES_KEY, new ListTag());
         surfaces.add(surf);
         data.put(SURFACES_KEY, surfaces);
         setData(player, data);
@@ -279,7 +335,15 @@ public class PointDataStore {
 
     public static void removeSurface(@Nonnull Player player, @Nonnull String surfaceId) {
         CompoundTag data = getData(player);
+        // Remove this surface from any connected surfaces' lists
         ListTag surfaces = data.getList(SURFACES_KEY, Tag.TAG_COMPOUND);
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            List<String> conns = getConnectedSurfacesList(s);
+            if (conns.remove(surfaceId)) {
+                s.put(CONNECTED_SURFACES_KEY, stringsToListTag(conns));
+            }
+        }
         surfaces.removeIf(t -> ((CompoundTag)t).getString(SURFACE_ID_KEY).equals(surfaceId));
         data.put(SURFACES_KEY, surfaces);
         setData(player, data);
@@ -290,29 +354,239 @@ public class PointDataStore {
         return getData(player).getList(SURFACES_KEY, Tag.TAG_COMPOUND);
     }
 
-    /** Find the surface that contains both given point UUIDs as consecutive or wrap-around neighbors. */
-    @Nullable
-    public static String findSurfaceByEdge(@Nonnull Player player, @Nonnull String uuidA, @Nonnull String uuidB) {
-        ListTag surfaces = getSurfaces(player);
-        for (int i = 0; i < surfaces.size(); i++) {
-            CompoundTag surf = surfaces.getCompound(i);
-            ListTag pts = surf.getList(SURFACE_POINTS_KEY, Tag.TAG_STRING);
-            if (hasEdge(pts, uuidA, uuidB)) {
-                return surf.getString(SURFACE_ID_KEY);
-            }
-        }
-        return null;
+    /** Get the fill color for a surface tag. Returns [r,g,b,a]. */
+    @Nonnull
+    public static float[] getSurfaceFillColor(@Nonnull CompoundTag surf) {
+        return new float[]{
+            surf.getFloat(COLOR_R_KEY),
+            surf.getFloat(COLOR_G_KEY),
+            surf.getFloat(COLOR_B_KEY),
+            surf.getFloat(COLOR_A_KEY)
+        };
     }
 
-    private static boolean hasEdge(ListTag pts, String a, String b) {
-        int n = pts.size();
-        if (n < 2) return false;
-        for (int i = 0; i < n; i++) {
-            String cur = pts.getString(i);
-            String next = pts.getString((i + 1) % n);
-            if ((cur.equals(a) && next.equals(b)) || (cur.equals(b) && next.equals(a))) return true;
+    /** Get the outline color for a surface tag (brighter version of fill). */
+    @Nonnull
+    public static float[] getSurfaceOutlineColor(@Nonnull CompoundTag surf) {
+        float[] fill = getSurfaceFillColor(surf);
+        return new float[]{
+            Math.min(1f, fill[0] + 0.2f),
+            Math.min(1f, fill[1] + 0.2f),
+            Math.min(1f, fill[2] + 0.2f),
+            Math.min(1f, fill[3] + 0.3f)
+        };
+    }
+
+    /** Assign the same color to two surfaces (for connecting). */
+    public static void assignSameColor(@Nonnull Player player, @Nonnull String surfIdA, @Nonnull String surfIdB) {
+        ListTag surfaces = getSurfaces(player);
+        float[] colorSrc = null;
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            if (s.getString(SURFACE_ID_KEY).equals(surfIdA)) {
+                colorSrc = getSurfaceFillColor(s);
+                break;
+            }
+        }
+        if (colorSrc == null) return;
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            if (s.getString(SURFACE_ID_KEY).equals(surfIdB)) {
+                s.putFloat(COLOR_R_KEY, colorSrc[0]);
+                s.putFloat(COLOR_G_KEY, colorSrc[1]);
+                s.putFloat(COLOR_B_KEY, colorSrc[2]);
+                s.putFloat(COLOR_A_KEY, colorSrc[3]);
+                break;
+            }
+        }
+    }
+
+    /** Connect two surfaces (bidirectional). */
+    public static void connectSurfaces(@Nonnull Player player, @Nonnull String surfIdA, @Nonnull String surfIdB) {
+        ListTag surfaces = getSurfaces(player);
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            String id = s.getString(SURFACE_ID_KEY);
+            ListTag conns = s.getList(CONNECTED_SURFACES_KEY, Tag.TAG_STRING);
+            if (id.equals(surfIdA) && !containsString(conns, surfIdB)) {
+                conns.add(StringTag.valueOf(surfIdB));
+                s.put(CONNECTED_SURFACES_KEY, conns);
+            }
+            if (id.equals(surfIdB) && !containsString(conns, surfIdA)) {
+                conns.add(StringTag.valueOf(surfIdA));
+                s.put(CONNECTED_SURFACES_KEY, conns);
+            }
+        }
+        assignSameColor(player, surfIdA, surfIdB);
+    }
+
+    /** Disconnect two surfaces. */
+    public static void disconnectSurfaces(@Nonnull Player player, @Nonnull String surfIdA, @Nonnull String surfIdB) {
+        ListTag surfaces = getSurfaces(player);
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            String id = s.getString(SURFACE_ID_KEY);
+            ListTag conns = s.getList(CONNECTED_SURFACES_KEY, Tag.TAG_STRING);
+            if (id.equals(surfIdA) || id.equals(surfIdB)) {
+                conns.removeIf(t -> ((StringTag)t).getAsString().equals(
+                    id.equals(surfIdA) ? surfIdB : surfIdA
+                ));
+                s.put(CONNECTED_SURFACES_KEY, conns);
+            }
+        }
+    }
+
+    /** Check if two surfaces are connected. */
+    public static boolean areSurfacesConnected(@Nonnull Player player, @Nonnull String surfIdA, @Nonnull String surfIdB) {
+        ListTag surfaces = getSurfaces(player);
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            if (s.getString(SURFACE_ID_KEY).equals(surfIdA)) {
+                return containsString(s.getList(CONNECTED_SURFACES_KEY, Tag.TAG_STRING), surfIdB);
+            }
         }
         return false;
+    }
+
+    /** Get list of connected surface UUIDs for a surface. */
+    @Nonnull
+    public static List<String> getConnectedSurfaceIds(@Nonnull Player player, @Nonnull String surfaceId) {
+        ListTag surfaces = getSurfaces(player);
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            if (s.getString(SURFACE_ID_KEY).equals(surfaceId)) {
+                List<String> result = new ArrayList<>();
+                ListTag conns = s.getList(CONNECTED_SURFACES_KEY, Tag.TAG_STRING);
+                for (int j = 0; j < conns.size(); j++) {
+                    result.add(conns.getString(j));
+                }
+                return result;
+            }
+        }
+        return new ArrayList<>();
+    }
+
+    /** Check if two surfaces have the same point count (same shape prerequisite). */
+    public static boolean hasSameShape(@Nonnull Player player, @Nonnull String surfIdA, @Nonnull String surfIdB) {
+        ListTag surfaces = getSurfaces(player);
+        List<Vec3> posA = null, posB = null;
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            String id = s.getString(SURFACE_ID_KEY);
+            List<Vec3> pos = getSurfacePositions(player, s);
+            if (id.equals(surfIdA)) posA = pos;
+            if (id.equals(surfIdB)) posB = pos;
+        }
+        if (posA == null || posB == null || posA.size() < 3 || posA.size() != posB.size()) return false;
+        int n = posA.size();
+
+        // Compute edge lengths
+        double[] edgesA = new double[n];
+        double[] edgesB = new double[n];
+        for (int i = 0; i < n; i++) {
+            edgesA[i] = posA.get(i).distanceTo(posA.get((i + 1) % n));
+            edgesB[i] = posB.get(i).distanceTo(posB.get((i + 1) % n));
+        }
+
+        // Normalize by average edge length (handles scaling)
+        double avgA = 0, avgB = 0;
+        for (int i = 0; i < n; i++) { avgA += edgesA[i]; avgB += edgesB[i]; }
+        avgA /= n; avgB /= n;
+        if (avgA < 1e-10 || avgB < 1e-10) return false;
+        for (int i = 0; i < n; i++) { edgesA[i] /= avgA; edgesB[i] /= avgB; }
+
+        // Try all cyclic shifts + reversal to handle ordering differences
+        double best = Double.MAX_VALUE;
+        for (int shift = 0; shift < n; shift++) {
+            double fwd = 0, rev = 0;
+            for (int i = 0; i < n; i++) {
+                double dF = edgesA[i] - edgesB[(i + shift) % n];
+                fwd += dF * dF;
+                double dR = edgesA[i] - edgesB[(n - 1 - i + shift) % n];
+                rev += dR * dR;
+            }
+            best = Math.min(best, Math.min(fwd, rev));
+        }
+
+        return best < 0.1 * n; // 10% RMS tolerance per edge
+    }
+
+    /** Duplicate a surface: copy all its points, create new surface with same shape, return new surface ID. */
+    @Nonnull
+    public static String copySurface(@Nonnull Player player, @Nonnull String sourceSurfaceId) {
+        CompoundTag data = getData(player);
+        ListTag pointList = data.getList(POINTS_KEY, Tag.TAG_COMPOUND);
+        ListTag surfaces = data.getList(SURFACES_KEY, Tag.TAG_COMPOUND);
+
+        // Find source surface
+        CompoundTag srcSurf = null;
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            if (s.getString(SURFACE_ID_KEY).equals(sourceSurfaceId)) {
+                srcSurf = s;
+                break;
+            }
+        }
+        if (srcSurf == null) return "";
+
+        // Duplicate each point (new UUID, same position)
+        ListTag srcPtIds = srcSurf.getList(SURFACE_POINTS_KEY, Tag.TAG_STRING);
+        List<String> newPtIds = new ArrayList<>();
+        for (int i = 0; i < srcPtIds.size(); i++) {
+            String oldUuid = srcPtIds.getString(i);
+            CompoundTag oldPt = getPointByUuid(player, oldUuid);
+            if (oldPt == null) continue;
+            String newUuid = UUID.randomUUID().toString();
+            CompoundTag newPt = new CompoundTag();
+            newPt.putString(ID_KEY, newUuid);
+            newPt.putDouble(X_KEY, oldPt.getDouble(X_KEY));
+            newPt.putDouble(Y_KEY, oldPt.getDouble(Y_KEY));
+            newPt.putDouble(Z_KEY, oldPt.getDouble(Z_KEY));
+            newPt.put(CONNECTIONS_KEY, new ListTag());
+            pointList.add(newPt);
+            newPtIds.add(newUuid);
+        }
+
+        // Create new surface
+        CompoundTag newSurf = new CompoundTag();
+        String newSurfId = UUID.randomUUID().toString();
+        newSurf.putString(SURFACE_ID_KEY, newSurfId);
+        ListTag newPtList = new ListTag();
+        for (String id : newPtIds) {
+            newPtList.add(StringTag.valueOf(id));
+        }
+        newSurf.put(SURFACE_POINTS_KEY, newPtList);
+        // Copy color from source
+        newSurf.putFloat(COLOR_R_KEY, srcSurf.getFloat(COLOR_R_KEY));
+        newSurf.putFloat(COLOR_G_KEY, srcSurf.getFloat(COLOR_G_KEY));
+        newSurf.putFloat(COLOR_B_KEY, srcSurf.getFloat(COLOR_B_KEY));
+        newSurf.putFloat(COLOR_A_KEY, srcSurf.getFloat(COLOR_A_KEY));
+        newSurf.put(CONNECTED_SURFACES_KEY, new ListTag());
+        surfaces.add(newSurf);
+
+        data.put(POINTS_KEY, pointList);
+        data.put(SURFACES_KEY, surfaces);
+        setData(player, data);
+
+        // Auto-connect copy to original
+        connectSurfaces(player, sourceSurfaceId, newSurfId);
+
+        return newSurfId;
+    }
+
+    /** Update all point positions for a surface (used by scale/rotate). */
+    public static void setSurfacePointPositions(@Nonnull Player player, @Nonnull String surfaceId, @Nonnull List<Vec3> newPositions) {
+        ListTag surfaces = getSurfaces(player);
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            if (!s.getString(SURFACE_ID_KEY).equals(surfaceId)) continue;
+            ListTag ptUuids = s.getList(SURFACE_POINTS_KEY, Tag.TAG_STRING);
+            int n = Math.min(ptUuids.size(), newPositions.size());
+            for (int j = 0; j < n; j++) {
+                setPointPos(player, ptUuids.getString(j), newPositions.get(j));
+            }
+            break;
+        }
     }
 
     /** Get the ordered Vec3 positions for all points in a surface. */
@@ -357,11 +631,9 @@ public class PointDataStore {
                                               String start, String current, java.util.Set<String> visited,
                                               java.util.List<String> path, List<String> bestCycle) {
         for (String neighbor : graph.getOrDefault(current, java.util.Collections.emptyList())) {
-            // skip going back to the node we just came from
             if (path.size() >= 2 && neighbor.equals(path.get(path.size() - 2))) continue;
 
             if (neighbor.equals(start) && path.size() >= 3) {
-                // found a cycle back to start
                 if (bestCycle == null || path.size() < bestCycle.size()) {
                     bestCycle = new ArrayList<>(path);
                 }
@@ -388,5 +660,23 @@ public class PointDataStore {
             if (p != null) positions.add(p);
         }
         return positions;
+    }
+
+    // ─── Helpers ───
+
+    private static boolean containsString(ListTag list, String value) {
+        for (int i = 0; i < list.size(); i++) {
+            if (list.getString(i).equals(value)) return true;
+        }
+        return false;
+    }
+
+    private static List<String> getConnectedSurfacesList(CompoundTag surf) {
+        List<String> result = new ArrayList<>();
+        ListTag list = surf.getList(CONNECTED_SURFACES_KEY, Tag.TAG_STRING);
+        for (int i = 0; i < list.size(); i++) {
+            result.add(list.getString(i));
+        }
+        return result;
     }
 }
