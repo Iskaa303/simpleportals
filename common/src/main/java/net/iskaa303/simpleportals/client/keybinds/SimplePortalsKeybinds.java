@@ -43,7 +43,7 @@ public final class SimplePortalsKeybinds {
     /** Get a human-readable component for a key code. */
     public static Component getKeyName(int keyCode) {
         if (keyCode < 0) return Component.translatable("key.simpleportals.unbound");
-        return Component.translatable(InputConstants.getKey(keyCode, -1).getName());
+        return InputConstants.getKey(keyCode, -1).getDisplayName();
     }
 
     /** All key codes (for iteration). */
