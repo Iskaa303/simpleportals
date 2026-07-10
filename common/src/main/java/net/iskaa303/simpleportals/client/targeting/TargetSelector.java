@@ -1,11 +1,12 @@
 package net.iskaa303.simpleportals.client.targeting;
 
+import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
 import net.iskaa303.simpleportals.client.render.RenderConstants;
+import net.iskaa303.simpleportals.item.PortalStick;
+import net.iskaa303.simpleportals.item.PortalStickMode;
 import net.iskaa303.simpleportals.item.PointDataStore;
-import net.iskaa303.simpleportals.registry.SimplePortalsItems;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.Direction;
@@ -27,7 +28,7 @@ public final class TargetSelector {
 
     private static Vec3 smoothedRenderPos;
     private static BlockHitResult latestHitResult;
-    // Connection snap endpoints (Shift + Connection Stick)
+    // Connection snap endpoints
     private static Vec3 snappedConnectionA;
     private static Vec3 snappedConnectionB;
     private static String snappedConnectionUuidA;
@@ -37,7 +38,7 @@ public final class TargetSelector {
     private static Vec3 snappedSurfaceA;
     private static Vec3 snappedSurfaceB;
     private static List<Vec3> snappedSurfaceVertices;
-    // Preview surface vertices (Surface Stick cursor on point with cycle)
+    // Preview surface vertices (cursor on point with cycle)
     private static List<Vec3> previewSurfaceVerts;
     private TargetSelector() {}
 
@@ -67,16 +68,20 @@ public final class TargetSelector {
         snappedSurfaceB = null;
         snappedSurfaceVertices = null;
         previewSurfaceVerts = null;
-        boolean isConnectionStick = isHoldingConnectionStick(player);
-        boolean isSurfaceStick = isHoldingSurfaceStick(player);
+
+        PortalStickMode mode = PointDataStore.getMode(player);
         List<Vec3> savedPoints = getSavedPoints(player);
-        if (Screen.hasControlDown() && savedPoints != null && !savedPoints.isEmpty()) {
+
+        boolean snapToPoint = SimplePortalsKeybinds.isDown(SimplePortalsKeybinds.getSnapPoint());
+        boolean snapToGrid = SimplePortalsKeybinds.isDown(SimplePortalsKeybinds.getSnapGrid());
+
+        if (snapToPoint && savedPoints != null && !savedPoints.isEmpty()) {
             Vec3 nearest = getNearestPoint(targetPos, savedPoints);
             if (nearest != null) targetPos = nearest;
-        } else if (player.isShiftKeyDown()) {
-            if (isSurfaceStick && savedPoints != null && !savedPoints.isEmpty()) {
+        } else if (snapToGrid) {
+            if (mode == PortalStickMode.SURFACE && savedPoints != null && !savedPoints.isEmpty()) {
                 targetPos = snapToNearestSurface(player, targetPos);
-            } else if (isConnectionStick && savedPoints != null && !savedPoints.isEmpty()) {
+            } else if (mode == PortalStickMode.CONNECTION && savedPoints != null && !savedPoints.isEmpty()) {
                 targetPos = snapToNearestConnection(player, targetPos);
             } else {
                 targetPos = hitResult.getType() != HitResult.Type.MISS
@@ -85,12 +90,12 @@ public final class TargetSelector {
             }
         }
 
-        // Compute preview surface if cursor is on a point and holding surface stick
-        if (isSurfaceStick) {
+        // Compute preview surface if cursor is on a point and in surface mode
+        if (mode == PortalStickMode.SURFACE) {
             computePreviewSurface(player, targetPos);
         }
 
-        boolean shouldSmooth = player.isShiftKeyDown() || Screen.hasControlDown();
+        boolean shouldSmooth = snapToGrid || snapToPoint;
         return smoothRenderPos(targetPos, shouldSmooth);
     }
 
@@ -140,28 +145,14 @@ public final class TargetSelector {
 
     // ─── Helpers ───
 
-    // ─── Helpers ───
-
-    private static boolean isHoldingConnectionStick(LocalPlayer player) {
-        var connStick = SimplePortalsItems.CONNECTION_STICK.get();
-        if (connStick == null) return false;
-        return player.getMainHandItem().is(connStick) || player.getOffhandItem().is(connStick);
-    }
-
-    private static boolean isHoldingSurfaceStick(LocalPlayer player) {
-        var surfStick = SimplePortalsItems.SURFACE_STICK.get();
-        if (surfStick == null) return false;
-        return player.getMainHandItem().is(surfStick) || player.getOffhandItem().is(surfStick);
+    private static boolean isHoldingPortalStick(@Nonnull LocalPlayer player) {
+        var stick = net.iskaa303.simpleportals.registry.SimplePortalsItems.PORTAL_STICK.get();
+        if (stick == null) return false;
+        return player.getMainHandItem().is(stick) || player.getOffhandItem().is(stick);
     }
 
     private static List<Vec3> getSavedPoints(LocalPlayer player) {
-        var pointStick = SimplePortalsItems.POINT_STICK.get();
-        var connStick = SimplePortalsItems.CONNECTION_STICK.get();
-        var surfStick = SimplePortalsItems.SURFACE_STICK.get();
-        boolean hasStick = (pointStick != null && (player.getMainHandItem().is(pointStick) || player.getOffhandItem().is(pointStick)))
-                || (connStick != null && (player.getMainHandItem().is(connStick) || player.getOffhandItem().is(connStick)))
-                || (surfStick != null && (player.getMainHandItem().is(surfStick) || player.getOffhandItem().is(surfStick)));
-        if (!hasStick) return null;
+        if (!isHoldingPortalStick(player)) return null;
         return PointDataStore.getPoints(player);
     }
 

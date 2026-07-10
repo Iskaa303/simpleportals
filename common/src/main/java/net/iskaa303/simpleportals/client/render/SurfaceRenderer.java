@@ -56,13 +56,11 @@ public final class SurfaceRenderer {
         int n = verts.size();
         if (n < 3) return;
 
-        // ponytail: fan triangulation from v0, works for convex cycles, add ear-clip if concave cycles appear
         Vec3 v0 = verts.get(0);
         for (int i = 1; i < n - 1; i++) {
             Vec3 v1 = verts.get(i);
             Vec3 v2 = verts.get(i + 1);
 
-            // ponytail: render triangle twice (both windings) so both sides visible regardless of culling
             // Front face: v0,v1,v2
             b.addVertex(last, (float) v0.x, (float) v0.y, (float) v0.z)
                     .setColor(fillColor[0], fillColor[1], fillColor[2], fillColor[3]);

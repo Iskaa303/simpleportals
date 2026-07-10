@@ -98,7 +98,6 @@ public final class CursorRenderer {
         Vec3 normal = v1.subtract(v0).cross(v2.subtract(v0)).normalize();
         if (normal == null) normal = new Vec3(0, 1, 0);
 
-        // ponytail: single wireframe offset slightly above the surface, same visual style as the normal cursor
         double offset = 0.003;
         Vec3 shift = normal.scale(offset);
         for (int i = 0; i < n; i++) {

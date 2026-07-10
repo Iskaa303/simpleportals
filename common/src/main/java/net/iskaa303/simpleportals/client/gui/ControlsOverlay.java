@@ -1,8 +1,11 @@
 package net.iskaa303.simpleportals.client.gui;
 
+import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
 import net.iskaa303.simpleportals.client.targeting.TargetSelector;
 import net.iskaa303.simpleportals.config.OverlayPosition;
 import net.iskaa303.simpleportals.config.SimplePortalsConfig;
+import net.iskaa303.simpleportals.item.PortalStickMode;
+import net.iskaa303.simpleportals.item.PointDataStore;
 import net.iskaa303.simpleportals.registry.SimplePortalsItems;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -12,7 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
-/** HUD controls overlay for Point Stick and Connection Stick. */
+/** HUD controls overlay for the Portal Stick. */
 public final class ControlsOverlay {
 
     private ControlsOverlay() {}
@@ -22,39 +25,36 @@ public final class ControlsOverlay {
         Player player = mc.player;
         if (player == null) return;
 
-        var pointStick = SimplePortalsItems.POINT_STICK.get();
-        var connStick = SimplePortalsItems.CONNECTION_STICK.get();
-        var surfStick = SimplePortalsItems.SURFACE_STICK.get();
-        if (pointStick == null && connStick == null && surfStick == null) return;
+        var stick = SimplePortalsItems.PORTAL_STICK.get();
+        if (stick == null) return;
 
         ItemStack main = player.getMainHandItem();
         ItemStack off = player.getOffhandItem();
-        boolean hasPointStick = pointStick != null && (main.is(pointStick) || off.is(pointStick));
-        boolean hasConnStick = connStick != null && (main.is(connStick) || off.is(connStick));
-        boolean hasSurfStick = surfStick != null && (main.is(surfStick) || off.is(surfStick));
-        if (!hasPointStick && !hasConnStick && !hasSurfStick) return;
+        if (!main.is(stick) && !off.is(stick)) return;
 
         Font font = mc.font;
         int screenW = mc.getWindow().getGuiScaledWidth();
         int screenH = mc.getWindow().getGuiScaledHeight();
 
-        String[] lines;
-        if (hasConnStick) {
-            lines = new String[]{
-                    Component.translatable("controls.simpleportals.connection_stick.line1").getString(),
-                    Component.translatable("controls.simpleportals.connection_stick.line2").getString()
-            };
-        } else if (hasSurfStick) {
-            lines = new String[]{
-                    Component.translatable("controls.simpleportals.surface_stick.line1").getString(),
-                    Component.translatable("controls.simpleportals.surface_stick.line2").getString()
-            };
-        } else {
-            lines = new String[]{
-                    Component.translatable("controls.simpleportals.point_stick.line1").getString(),
-                    Component.translatable("controls.simpleportals.point_stick.line2").getString()
-            };
-        }
+        PortalStickMode mode = PointDataStore.getMode(player);
+
+        // Show dynamic keybinding display names so rebinding is reflected
+        String modeWheelKey = SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getModeWheel()).getString();
+        String snapGridKey = SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getSnapGrid()).getString();
+        String snapPointKey = SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getSnapPoint()).getString();
+
+        Component modeLine = Component.translatable("controls.simpleportals.portal_stick.mode", mode.displayName());
+        Component controlsLine = Component.translatable(
+                "controls.simpleportals.portal_stick.controls",
+                modeWheelKey, snapGridKey, snapPointKey
+        );
+        Component actionLine = Component.translatable("controls.simpleportals.portal_stick.action");
+
+        String[] lines = new String[]{
+                modeLine.getString(),
+                controlsLine.getString(),
+                actionLine.getString()
+        };
 
         Vec3 target = TargetSelector.getCurrentTarget();
         if (target != null) {

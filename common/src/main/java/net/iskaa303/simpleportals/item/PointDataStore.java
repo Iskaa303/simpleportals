@@ -17,7 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Per-player points + connections.
+ * Per-player data.
  */
 public class PointDataStore {
 
@@ -33,6 +33,7 @@ public class PointDataStore {
     private static final String SURFACE_ID_KEY = "surface_id";
     private static final String SURFACE_POINTS_KEY = "points";
     private static final double EPSILON = 0.0001;
+    private static final String MODE_KEY = "portal_stick_mode";
 
     private static final Map<UUID, CompoundTag> PLAYER_DATA = new ConcurrentHashMap<>();
 
@@ -44,6 +45,22 @@ public class PointDataStore {
 
     private static void setData(@Nonnull Player player, @Nonnull CompoundTag data) {
         PLAYER_DATA.put(player.getUUID(), data);
+    }
+
+    // ─── Mode persistence ───
+
+    public static PortalStickMode getMode(@Nonnull Player player) {
+        CompoundTag data = getData(player);
+        if (data.contains(MODE_KEY, Tag.TAG_STRING)) {
+            return PortalStickMode.byName(data.getString(MODE_KEY));
+        }
+        return PortalStickMode.POINT; // default
+    }
+
+    public static void setMode(@Nonnull Player player, @Nonnull PortalStickMode mode) {
+        CompoundTag data = getData(player);
+        data.putString(MODE_KEY, mode.getSerializedName());
+        setData(player, data);
     }
 
     @Nonnull

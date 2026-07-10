@@ -6,7 +6,7 @@ import net.minecraft.world.entity.player.Player;
 import java.nio.file.Path;
 
 /**
- * Platform abstraction, like EMI's EmiAgnos.
+ * Platform abstraction.
  * Provides loader-specific services without common code knowing the loader.
  */
 public abstract class SimplePortalsAgnos {

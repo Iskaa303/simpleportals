@@ -1,21 +1,34 @@
 {
-    "item.simpleportals.point_stick": "Point Stick",
-    "item.simpleportals.connection_stick": "Connection Stick",
-    "item.simpleportals.surface_stick": "Surface Stick",
-    "controls.simpleportals.point_stick.line1": "§fRight Click: Create/Delete Point",
-    "controls.simpleportals.point_stick.line2": "§fShift: Snap to Grid   §fCtrl: Snap to Point",
-    "controls.simpleportals.connection_stick.line1": "§fRight Click: Select Endpoint / Create Connection",
-    "controls.simpleportals.connection_stick.line2": "§fShift: Snap to Connection   §fCtrl: Snap to Point",
-    "controls.simpleportals.surface_stick.line1": "§fRight Click: Create Surface from closed loop",
-    "controls.simpleportals.surface_stick.line2": "§fShift: Snap to Surface   §fCtrl: Snap to Point",
+    "item.simpleportals.portal_stick": "Portal Stick",
+    "item.simpleportals.portal_stick.tooltip": "§7Holds three tools in one: Point, Connection, Surface modes",
+    "item.simpleportals.portal_stick.mode.point": "Point Mode",
+    "item.simpleportals.portal_stick.mode.connection": "Connection Mode",
+    "item.simpleportals.portal_stick.mode.surface": "Surface Mode",
+
+    "key.category.simpleportals": "Simple Portals",
+    "key.simpleportals.mode_wheel": "Open Mode Wheel",
+    "key.simpleportals.snap_grid": "Snap to Grid/Surface/Connection",
+    "key.simpleportals.snap_point": "Snap to Existing Point",
+    "key.simpleportals.unbound": "None",
+
+    "config.simpleportals.keys": "Keybindings",
+    "config.simpleportals.keyModeWheel": "Mode Wheel",
+    "config.simpleportals.keySnapGrid": "Snap Grid",
+    "config.simpleportals.keySnapPoint": "Snap Point",
+
+    "controls.simpleportals.portal_stick.mode": "§6Mode: %s",
+    "controls.simpleportals.portal_stick.controls": "§7[%s] Wheel   [%s] Snap   [%s] Point Snap",
+    "controls.simpleportals.portal_stick.action": "§fRight Click: Execute current mode action",
+
     "message.simpleportals.point_created": "§bPoint Created",
     "message.simpleportals.point_removed": "§cPoint Removed",
     "message.simpleportals.connection_created": "§aConnection created",
     "message.simpleportals.connection_removed": "§cConnection removed",
     "message.simpleportals.endpoint_selected": "§eEndpoint selected",
     "message.simpleportals.endpoint_deselected": "§cEndpoint deselected",
-    "message.simpleportals.no_point_at_cursor": "§7No point at cursor — use Point Stick to create one",
+    "message.simpleportals.no_point_at_cursor": "§7No point at cursor — use Portal Stick to create one",
     "message.simpleportals.surface_created": "§aSurface created, points consumed",
     "message.simpleportals.surface_removed": "§cSurface removed",
-    "message.simpleportals.no_loop_found": "§7No closed loop found at this point"
+    "message.simpleportals.no_loop_found": "§7No closed loop found at this point",
+    "message.simpleportals.mode_changed": "§aSwitched to %s"
 }

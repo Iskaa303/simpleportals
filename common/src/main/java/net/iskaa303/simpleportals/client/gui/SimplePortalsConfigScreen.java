@@ -1,6 +1,7 @@
 package net.iskaa303.simpleportals.client.gui;
 
 import net.iskaa303.simpleportals.Constants;
+import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
 import net.iskaa303.simpleportals.config.OverlayPosition;
 import net.iskaa303.simpleportals.config.SimplePortalsConfig;
 import net.minecraft.client.Minecraft;
@@ -11,6 +12,9 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import org.lwjgl.glfw.GLFW;
+
+import java.util.function.Consumer;
 
 public class SimplePortalsConfigScreen extends Screen {
 
@@ -24,9 +28,14 @@ public class SimplePortalsConfigScreen extends Screen {
     private EditBox intField;
     private Button intUp, intDown;
 
+    // Keybinding buttons
+    private Button keyModeWheelBtn, keySnapGridBtn, keySnapPointBtn;
+    private int listeningForKey = -1; // -1 = not listening, 0/1/2 = which keybinding
+
     // Layout
     private int listLeft, listRight, listTop, listBottom;
     private int rowLeft, rowWidth, overlayY, precisionY;
+    private int keySectionY;
 
     public SimplePortalsConfigScreen(Screen last) {
         super(Component.literal(Constants.MOD_NAME + " Config"));
@@ -50,6 +59,7 @@ public class SimplePortalsConfigScreen extends Screen {
 
         overlayY = listTop + 24;
         precisionY = overlayY + 28;
+        keySectionY = precisionY + 36;
 
         int btnX = rowLeft + rowWidth - 130 - 12;
 
@@ -86,11 +96,22 @@ public class SimplePortalsConfigScreen extends Screen {
         intDown = Button.builder(Component.literal("▼"), b -> tickInt(-1))
                 .bounds(arrowX, precisionY + 14, 14, 10).build();
 
-        // All interactive widgets registered as renderable+child for focus & click
+        // Keybinding buttons
+        int keyBtnY = keySectionY + 24;
+        keyModeWheelBtn = makeKeyButton(SimplePortalsKeybinds.getModeWheel(),
+                keySectionY + 24, btnX, v -> SimplePortalsKeybinds.setModeWheel(v));
+        keySnapGridBtn = makeKeyButton(SimplePortalsKeybinds.getSnapGrid(),
+                keySectionY + 50, btnX, v -> SimplePortalsKeybinds.setSnapGrid(v));
+        keySnapPointBtn = makeKeyButton(SimplePortalsKeybinds.getSnapPoint(),
+                keySectionY + 76, btnX, v -> SimplePortalsKeybinds.setSnapPoint(v));
+
         addRenderableWidget(overlayBtn);
         addRenderableWidget(intField);
         addRenderableWidget(intUp);
         addRenderableWidget(intDown);
+        addRenderableWidget(keyModeWheelBtn);
+        addRenderableWidget(keySnapGridBtn);
+        addRenderableWidget(keySnapPointBtn);
 
         addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
                 .bounds(cx - w / 2, by, w / 2 - 2, 20).build());
@@ -99,7 +120,59 @@ public class SimplePortalsConfigScreen extends Screen {
                     intField.setValue(String.valueOf(SimplePortalsConfig.dotPrecision));
                     overlayBtn.setMessage(Component.literal(
                             SimplePortalsConfig.overlayPosition.getName()));
+                    updateKeyButtons();
                 }).bounds(cx + 2, by, w / 2 - 2, 20).build());
+    }
+
+    private Button makeKeyButton(int initialKey, int y, int btnX, Consumer<Integer> setter) {
+        return Button.builder(
+                SimplePortalsKeybinds.getKeyName(initialKey),
+                btn -> {
+                    if (listeningForKey == -1) {
+                        // Start listening
+                        listeningForKey = getListeningIndex(btn);
+                        btn.setMessage(Component.literal("..."));
+                    }
+                }
+        ).bounds(btnX, y, 130, 20).build();
+    }
+
+    private int getListeningIndex(Button btn) {
+        if (btn == keyModeWheelBtn) return 0;
+        if (btn == keySnapGridBtn) return 1;
+        if (btn == keySnapPointBtn) return 2;
+        return -1;
+    }
+
+    private void applyKeyBinding(int index, int keyCode) {
+        switch (index) {
+            case 0 -> SimplePortalsKeybinds.setModeWheel(keyCode);
+            case 1 -> SimplePortalsKeybinds.setSnapGrid(keyCode);
+            case 2 -> SimplePortalsKeybinds.setSnapPoint(keyCode);
+        }
+        SimplePortalsConfig.save();
+        updateKeyButtons();
+        listeningForKey = -1;
+    }
+
+    private void updateKeyButtons() {
+        keyModeWheelBtn.setMessage(SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getModeWheel()));
+        keySnapGridBtn.setMessage(SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getSnapGrid()));
+        keySnapPointBtn.setMessage(SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getSnapPoint()));
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (listeningForKey >= 0) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                listeningForKey = -1;
+                updateKeyButtons();
+                return true;
+            }
+            applyKeyBinding(listeningForKey, keyCode);
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private void tickInt(int dir) {
@@ -112,15 +185,12 @@ public class SimplePortalsConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics gui, int mouseX, int mouseY, float delta) {
-        // Step 1: background blur (via super)
         super.render(gui, mouseX, mouseY, delta);
 
-        // Step 2: title
         gui.drawCenteredString(font,
                 Component.literal("§dSimple Portals§r  §aConfig§r"),
                 width / 2, 16, 0xFFFFFF);
 
-        // Step 3: list area elements
         gui.blit(HEADER_SEP, listLeft, listTop - 2, 0, 0,
                 listRight - listLeft, 2, 32, 2);
         gui.blit(FOOTER_SEP, listLeft, listBottom, 0, 0,
@@ -129,22 +199,36 @@ public class SimplePortalsConfigScreen extends Screen {
         gui.drawCenteredString(font, Component.literal("§lGeneral"),
                 (listLeft + listRight) / 2, listTop + 8, 0xFFFFFF);
 
-        // OverlayPosition row
+        // OverlayPosition
         gui.fill(rowLeft, overlayY, rowLeft + rowWidth, overlayY + 28, 0x66000000);
         gui.drawString(font, Component.literal("Overlay Position"),
                 rowLeft + 12, overlayY + 6, 0xFFFFFF);
 
-        // DotPrecision row
+        // DotPrecision
         gui.fill(rowLeft, precisionY, rowLeft + rowWidth, precisionY + 28, 0x66000000);
         gui.drawString(font, Component.literal("Dot Precision"),
                 rowLeft + 12, precisionY + 6, 0xFFFFFF);
 
-        // Step 4: redraw list-area widgets on top of fills (they were drawn
-        // by super.render() under the fills, so we need them on top)
+        // Keybindings section
+        gui.drawCenteredString(font, Component.literal("§lKeybindings"),
+                (listLeft + listRight) / 2, keySectionY, 0xFFFFFF);
+
+        gui.fill(rowLeft, keySectionY + 18, rowLeft + rowWidth, keySectionY + 100, 0x66000000);
+        gui.drawString(font, Component.translatable("config.simpleportals.keyModeWheel"),
+                rowLeft + 12, keySectionY + 28, 0xFFFFFF);
+        gui.drawString(font, Component.translatable("config.simpleportals.keySnapGrid"),
+                rowLeft + 12, keySectionY + 54, 0xFFFFFF);
+        gui.drawString(font, Component.translatable("config.simpleportals.keySnapPoint"),
+                rowLeft + 12, keySectionY + 80, 0xFFFFFF);
+
+        // Redraw widgets on top
         overlayBtn.render(gui, mouseX, mouseY, delta);
         intField.render(gui, mouseX, mouseY, delta);
         intUp.render(gui, mouseX, mouseY, delta);
         intDown.render(gui, mouseX, mouseY, delta);
+        keyModeWheelBtn.render(gui, mouseX, mouseY, delta);
+        keySnapGridBtn.render(gui, mouseX, mouseY, delta);
+        keySnapPointBtn.render(gui, mouseX, mouseY, delta);
     }
 
     @Override

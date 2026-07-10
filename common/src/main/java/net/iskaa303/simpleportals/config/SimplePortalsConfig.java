@@ -1,6 +1,7 @@
 package net.iskaa303.simpleportals.config;
 
 import net.iskaa303.simpleportals.Constants;
+import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
 
 import java.io.BufferedWriter;
 import java.nio.file.Files;
@@ -42,6 +43,15 @@ public class SimplePortalsConfig {
                         case "dotPrecision" -> {
                             try { dotPrecision = Integer.parseInt(val); } catch (NumberFormatException ignored) {}
                         }
+                        case "keyModeWheel" -> {
+                            try { SimplePortalsKeybinds.setModeWheel(Integer.parseInt(val)); } catch (NumberFormatException ignored) {}
+                        }
+                        case "keySnapGrid" -> {
+                            try { SimplePortalsKeybinds.setSnapGrid(Integer.parseInt(val)); } catch (NumberFormatException ignored) {}
+                        }
+                        case "keySnapPoint" -> {
+                            try { SimplePortalsKeybinds.setSnapPoint(Integer.parseInt(val)); } catch (NumberFormatException ignored) {}
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -69,6 +79,11 @@ public class SimplePortalsConfig {
             sb.append("\n");
             sb.append("# Integer value\n");
             sb.append("dotPrecision = ").append(dotPrecision).append("\n");
+            sb.append("\n");
+            sb.append("# Keybindings (GLFW key codes)\n");
+            sb.append("keyModeWheel = ").append(SimplePortalsKeybinds.getModeWheel()).append("\n");
+            sb.append("keySnapGrid = ").append(SimplePortalsKeybinds.getSnapGrid()).append("\n");
+            sb.append("keySnapPoint = ").append(SimplePortalsKeybinds.getSnapPoint()).append("\n");
             try (BufferedWriter w = Files.newBufferedWriter(file)) {
                 w.write(sb.toString());
             }
@@ -80,6 +95,7 @@ public class SimplePortalsConfig {
     public static void reset() {
         overlayPosition = OverlayPosition.BOTTOM_RIGHT;
         dotPrecision = 2;
+        SimplePortalsKeybinds.resetToDefaults();
         save();
     }
 }
