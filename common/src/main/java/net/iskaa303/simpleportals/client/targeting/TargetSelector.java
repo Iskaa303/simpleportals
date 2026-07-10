@@ -1,5 +1,6 @@
 package net.iskaa303.simpleportals.client.targeting;
 
+import net.iskaa303.simpleportals.client.gui.DragController;
 import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
 import net.iskaa303.simpleportals.client.render.RenderConstants;
 import net.iskaa303.simpleportals.item.PortalStick;
@@ -79,7 +80,12 @@ public final class TargetSelector {
             Vec3 nearest = getNearestPoint(targetPos, savedPoints);
             if (nearest != null) targetPos = nearest;
         } else if (snapToGrid) {
-            if (mode == PortalStickMode.SURFACE && savedPoints != null && !savedPoints.isEmpty()) {
+            if (DragController.isDragging()) {
+                // During drag, snap to grid blocks regardless of mode
+                targetPos = hitResult.getType() != HitResult.Type.MISS
+                        ? snapToSurface(hitResult)
+                        : snapToGrid(targetPos);
+            } else if (mode == PortalStickMode.SURFACE && savedPoints != null && !savedPoints.isEmpty()) {
                 targetPos = snapToNearestSurface(player, targetPos);
             } else if (mode == PortalStickMode.CONNECTION && savedPoints != null && !savedPoints.isEmpty()) {
                 targetPos = snapToNearestConnection(player, targetPos);

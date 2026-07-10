@@ -1,5 +1,6 @@
 package net.iskaa303.simpleportals.item;
 
+import net.iskaa303.simpleportals.client.gui.DragController;
 import net.iskaa303.simpleportals.client.targeting.TargetSelector;
 import net.iskaa303.simpleportals.registry.SimplePortalsItems;
 import net.minecraft.network.chat.Component;
@@ -33,6 +34,12 @@ public class PortalStick extends Item {
     public InteractionResultHolder<ItemStack> use(@Nonnull Level level, @Nonnull Player player, @Nonnull InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (stack == null) return null;
+
+        // Suppress right-click action while client is dragging
+        if (DragController.shouldCancelUse) {
+            DragController.shouldCancelUse = false;
+            return InteractionResultHolder.pass(stack);
+        }
 
         if (!level.isClientSide) {
             Vec3 target = TargetSelector.getCurrentTarget();
@@ -117,10 +124,6 @@ public class PortalStick extends Item {
         }
 
         PointDataStore.addSurface(player, cycle);
-        int n = cycle.size();
-        for (int i = 0; i < n; i++) {
-            PointDataStore.removeConnection(player, cycle.get(i), cycle.get((i + 1) % n));
-        }
         player.displayClientMessage(Component.translatable("message.simpleportals.surface_created"), true);
     }
 

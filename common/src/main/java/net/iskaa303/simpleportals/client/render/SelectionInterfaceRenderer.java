@@ -8,6 +8,7 @@ import net.iskaa303.simpleportals.Constants;
 import net.iskaa303.simpleportals.SimplePortalsMod;
 import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
 import net.iskaa303.simpleportals.client.targeting.TargetSelector;
+import net.iskaa303.simpleportals.config.SimplePortalsConfig;
 import net.iskaa303.simpleportals.item.PortalStickMode;
 import net.iskaa303.simpleportals.item.PointDataStore;
 import net.iskaa303.simpleportals.registry.SimplePortalsItems;
@@ -64,10 +65,7 @@ public class SelectionInterfaceRenderer {
 
         PortalStickMode mode = PointDataStore.getMode(player);
 
-        // Grid: in Point mode always show; in other modes hide while snapping
-        boolean snapToPoint = SimplePortalsKeybinds.isDown(SimplePortalsKeybinds.getSnapPoint());
-        boolean snapToGrid = SimplePortalsKeybinds.isDown(SimplePortalsKeybinds.getSnapGrid());
-        boolean showGrid = mode == PortalStickMode.POINT || (!snapToPoint && !snapToGrid);
+        boolean showGrid = SimplePortalsConfig.showGrid;
         if (showGrid) {
             GridRenderer.render(poseStack, eyePos, player.getViewVector(partialTicks),
                     hitResult, targetPos, builder);
@@ -76,9 +74,7 @@ public class SelectionInterfaceRenderer {
         Vec3[] cursorEndpoints = connEndpoints != null ? connEndpoints : surfEndpoints;
         CursorRenderer.render(poseStack, eyePos, targetPos, builder, cursorEndpoints, TargetSelector.getSnappedSurfaceVertices());
         SavedPointsRenderer.render(poseStack, player, builder, eyePos);
-        if (mode == PortalStickMode.SURFACE) {
-            SurfaceRenderer.render(poseStack, player, builder, eyePos);
-        }
+        SurfaceRenderer.render(poseStack, player, builder, eyePos);
 
         mc.renderBuffers().bufferSource().endBatch(renderType);
         poseStack.popPose();

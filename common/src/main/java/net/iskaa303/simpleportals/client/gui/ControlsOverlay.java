@@ -1,6 +1,9 @@
 package net.iskaa303.simpleportals.client.gui;
 
 import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
+import net.iskaa303.simpleportals.client.gui.DragController;
+import net.iskaa303.simpleportals.client.gui.DragController.DragMode;
+import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
 import net.iskaa303.simpleportals.client.targeting.TargetSelector;
 import net.iskaa303.simpleportals.config.OverlayPosition;
 import net.iskaa303.simpleportals.config.SimplePortalsConfig;
@@ -25,63 +28,74 @@ public final class ControlsOverlay {
         Player player = mc.player;
         if (player == null) return;
 
-        var stick = SimplePortalsItems.PORTAL_STICK.get();
-        if (stick == null) return;
-
-        ItemStack main = player.getMainHandItem();
-        ItemStack off = player.getOffhandItem();
-        if (!main.is(stick) && !off.is(stick)) return;
-
         Font font = mc.font;
         int screenW = mc.getWindow().getGuiScaledWidth();
         int screenH = mc.getWindow().getGuiScaledHeight();
 
         PortalStickMode mode = PointDataStore.getMode(player);
 
-        // Show dynamic keybinding display names so rebinding is reflected
+        var lines = new java.util.ArrayList<String>();
+
+        // Mode line
+        lines.add(Component.translatable("controls.simpleportals.portal_stick.mode",
+                mode.displayName()).getString());
+
+        // Controls line (keybinding names)
         String modeWheelKey = SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getModeWheel()).getString();
         String snapGridKey = SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getSnapGrid()).getString();
         String snapPointKey = SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getSnapPoint()).getString();
+        String toggleGridKey = SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getToggleGrid()).getString();
+        lines.add(Component.translatable("controls.simpleportals.portal_stick.controls",
+                modeWheelKey, snapGridKey, snapPointKey).getString());
 
-        Component modeLine = Component.translatable("controls.simpleportals.portal_stick.mode", mode.displayName());
-        Component controlsLine = Component.translatable(
-                "controls.simpleportals.portal_stick.controls",
-                modeWheelKey, snapGridKey, snapPointKey
-        );
-        Component actionLine = Component.translatable("controls.simpleportals.portal_stick.action");
+        // Grid toggle state
+        String gridState = SimplePortalsConfig.showGrid
+                ? "§aON"
+                : "§7OFF";
+        lines.add(Component.translatable("controls.simpleportals.portal_stick.grid",
+                toggleGridKey, gridState).getString());
 
-        String[] lines = new String[]{
-                modeLine.getString(),
-                controlsLine.getString(),
-                actionLine.getString()
-        };
+        // Drag or action line
+        if (DragController.isDragging()) {
+            String dragTarget = switch (DragController.getDragMode()) {
+                case POINT -> "point";
+                case CONNECTION -> "connection";
+                case SURFACE -> "surface";
+                default -> "";
+            };
+            lines.add(Component.translatable("controls.simpleportals.portal_stick.dragging",
+                    dragTarget).getString());
+            lines.add(Component.translatable("controls.simpleportals.portal_stick.place_hint").getString());
+        } else {
+            lines.add(Component.translatable("controls.simpleportals.portal_stick.action").getString());
+            lines.add(Component.translatable("controls.simpleportals.portal_stick.drag_hint").getString());
+        }
 
+        // Coordinates
         Vec3 target = TargetSelector.getCurrentTarget();
         if (target != null) {
             String fmt = "§fX: %." + SimplePortalsConfig.dotPrecision + "f"
                     + "  Y: %." + SimplePortalsConfig.dotPrecision + "f"
                     + "  Z: %." + SimplePortalsConfig.dotPrecision + "f";
             String coordLine = String.format(fmt, target.x, target.y, target.z);
-            String[] tmp = new String[lines.length + 1];
-            System.arraycopy(lines, 0, tmp, 0, lines.length);
-            tmp[lines.length] = coordLine;
-            lines = tmp;
+            lines.add(coordLine);
         }
 
+        // Measure and position
         int textW = 0;
         for (String line : lines) {
             int w = font.width(line);
             if (w > textW) textW = w;
         }
         int lineH = font.lineHeight;
-        int totalH = lines.length * lineH;
+        int totalH = lines.size() * lineH;
 
         OverlayPosition pos = SimplePortalsConfig.overlayPosition;
         int x = pos.getX(screenW, textW);
         int y = pos.getY(screenH, totalH);
 
-        for (int i = 0; i < lines.length; i++) {
-            guiGraphics.drawString(font, lines[i], x, y + i * lineH, 0xFFFFFF, true);
+        for (int i = 0; i < lines.size(); i++) {
+            guiGraphics.drawString(font, lines.get(i), x, y + i * lineH, 0xFFFFFF, true);
         }
     }
 }

@@ -2,6 +2,7 @@ package net.iskaa303.simpleportals.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.iskaa303.simpleportals.client.gui.DragController;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nonnull;
@@ -33,6 +34,10 @@ public final class CursorRenderer {
 
     private static void renderSingleBox(@Nonnull PoseStack ps, @Nonnull Vec3 camPos, Vec3 pos, VertexConsumer builder) {
         double h = RenderConstants.BOX_SIZE / 2.0;
+        float alpha = DragController.isDragging() ? 0.9f : 1.0f;
+        float r = DragController.isDragging() ? 1.0f : 0.94f;
+        float g = DragController.isDragging() ? 0.6f : 0.98f;
+        float b = DragController.isDragging() ? 0.0f : 1.0f;
         Vec3[] pts = {
                 new Vec3(pos.x - h, pos.y - h, pos.z - h),
                 new Vec3(pos.x + h, pos.y - h, pos.z - h),
@@ -43,12 +48,12 @@ public final class CursorRenderer {
                 new Vec3(pos.x - h, pos.y + h, pos.z + h),
                 new Vec3(pos.x + h, pos.y + h, pos.z + h)
         };
-
         for (int[] e : EDGES) {
             Vec3 normal = pts[e[0]].subtract(pos).normalize();
-            RenderUtils.renderLine(ps, builder, pts[e[0]], pts[e[1]], 1.0f, normal, camPos);
+            RenderUtils.renderLine(ps, builder, pts[e[0]], pts[e[1]], alpha, normal, camPos);
         }
     }
+
 
     /** Stretched prism from A to B — the connection runs through its center. */
     private static void renderStretchedBox(@Nonnull PoseStack ps, @Nonnull Vec3 camPos,

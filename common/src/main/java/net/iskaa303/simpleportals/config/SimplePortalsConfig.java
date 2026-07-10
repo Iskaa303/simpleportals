@@ -14,6 +14,7 @@ public class SimplePortalsConfig {
 
     public static OverlayPosition overlayPosition = OverlayPosition.BOTTOM_RIGHT;
     public static int dotPrecision = 2;
+    public static boolean showGrid = true;
 
     public static void load(Path dir) {
         configDir = dir;
@@ -52,6 +53,12 @@ public class SimplePortalsConfig {
                         case "keySnapPoint" -> {
                             try { SimplePortalsKeybinds.setSnapPoint(Integer.parseInt(val)); } catch (NumberFormatException ignored) {}
                         }
+                        case "keyToggleGrid" -> {
+                            try { SimplePortalsKeybinds.setToggleGrid(Integer.parseInt(val)); } catch (NumberFormatException ignored) {}
+                        }
+                        case "showGrid" -> {
+                            showGrid = val.equals("true");
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -84,6 +91,8 @@ public class SimplePortalsConfig {
             sb.append("keyModeWheel = ").append(SimplePortalsKeybinds.getModeWheel()).append("\n");
             sb.append("keySnapGrid = ").append(SimplePortalsKeybinds.getSnapGrid()).append("\n");
             sb.append("keySnapPoint = ").append(SimplePortalsKeybinds.getSnapPoint()).append("\n");
+            sb.append("keyToggleGrid = ").append(SimplePortalsKeybinds.getToggleGrid()).append("\n");
+            sb.append("showGrid = ").append(showGrid).append("\n");
             try (BufferedWriter w = Files.newBufferedWriter(file)) {
                 w.write(sb.toString());
             }
@@ -96,6 +105,7 @@ public class SimplePortalsConfig {
         overlayPosition = OverlayPosition.BOTTOM_RIGHT;
         dotPrecision = 2;
         SimplePortalsKeybinds.resetToDefaults();
+        showGrid = true;
         save();
     }
 }

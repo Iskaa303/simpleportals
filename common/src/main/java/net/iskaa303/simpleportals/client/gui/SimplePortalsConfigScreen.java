@@ -29,8 +29,8 @@ public class SimplePortalsConfigScreen extends Screen {
     private Button intUp, intDown;
 
     // Keybinding buttons
-    private Button keyModeWheelBtn, keySnapGridBtn, keySnapPointBtn;
-    private int listeningForKey = -1; // -1 = not listening, 0/1/2 = which keybinding
+    private Button keyModeWheelBtn, keySnapGridBtn, keySnapPointBtn, keyToggleGridBtn;
+    private int listeningForKey = -1; // -1 = not listening, 0..3 = which keybinding
 
     // Layout
     private int listLeft, listRight, listTop, listBottom;
@@ -97,13 +97,14 @@ public class SimplePortalsConfigScreen extends Screen {
                 .bounds(arrowX, precisionY + 14, 14, 10).build();
 
         // Keybinding buttons
-        int keyBtnY = keySectionY + 24;
         keyModeWheelBtn = makeKeyButton(SimplePortalsKeybinds.getModeWheel(),
                 keySectionY + 24, btnX, v -> SimplePortalsKeybinds.setModeWheel(v));
         keySnapGridBtn = makeKeyButton(SimplePortalsKeybinds.getSnapGrid(),
                 keySectionY + 50, btnX, v -> SimplePortalsKeybinds.setSnapGrid(v));
         keySnapPointBtn = makeKeyButton(SimplePortalsKeybinds.getSnapPoint(),
                 keySectionY + 76, btnX, v -> SimplePortalsKeybinds.setSnapPoint(v));
+        keyToggleGridBtn = makeKeyButton(SimplePortalsKeybinds.getToggleGrid(),
+                keySectionY + 102, btnX, v -> SimplePortalsKeybinds.setToggleGrid(v));
 
         addRenderableWidget(overlayBtn);
         addRenderableWidget(intField);
@@ -112,7 +113,7 @@ public class SimplePortalsConfigScreen extends Screen {
         addRenderableWidget(keyModeWheelBtn);
         addRenderableWidget(keySnapGridBtn);
         addRenderableWidget(keySnapPointBtn);
-
+        addRenderableWidget(keyToggleGridBtn);
         addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
                 .bounds(cx - w / 2, by, w / 2 - 2, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Reset"), b -> {
@@ -141,6 +142,7 @@ public class SimplePortalsConfigScreen extends Screen {
         if (btn == keyModeWheelBtn) return 0;
         if (btn == keySnapGridBtn) return 1;
         if (btn == keySnapPointBtn) return 2;
+        if (btn == keyToggleGridBtn) return 3;
         return -1;
     }
 
@@ -149,6 +151,7 @@ public class SimplePortalsConfigScreen extends Screen {
             case 0 -> SimplePortalsKeybinds.setModeWheel(keyCode);
             case 1 -> SimplePortalsKeybinds.setSnapGrid(keyCode);
             case 2 -> SimplePortalsKeybinds.setSnapPoint(keyCode);
+            case 3 -> SimplePortalsKeybinds.setToggleGrid(keyCode);
         }
         SimplePortalsConfig.save();
         updateKeyButtons();
@@ -159,6 +162,7 @@ public class SimplePortalsConfigScreen extends Screen {
         keyModeWheelBtn.setMessage(SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getModeWheel()));
         keySnapGridBtn.setMessage(SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getSnapGrid()));
         keySnapPointBtn.setMessage(SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getSnapPoint()));
+        keyToggleGridBtn.setMessage(SimplePortalsKeybinds.getKeyName(SimplePortalsKeybinds.getToggleGrid()));
     }
 
     @Override
@@ -213,13 +217,15 @@ public class SimplePortalsConfigScreen extends Screen {
         gui.drawCenteredString(font, Component.literal("§lKeybindings"),
                 (listLeft + listRight) / 2, keySectionY, 0xFFFFFF);
 
-        gui.fill(rowLeft, keySectionY + 18, rowLeft + rowWidth, keySectionY + 100, 0x66000000);
+        gui.fill(rowLeft, keySectionY + 18, rowLeft + rowWidth, keySectionY + 130, 0x66000000);
         gui.drawString(font, Component.translatable("config.simpleportals.keyModeWheel"),
                 rowLeft + 12, keySectionY + 28, 0xFFFFFF);
         gui.drawString(font, Component.translatable("config.simpleportals.keySnapGrid"),
                 rowLeft + 12, keySectionY + 54, 0xFFFFFF);
         gui.drawString(font, Component.translatable("config.simpleportals.keySnapPoint"),
                 rowLeft + 12, keySectionY + 80, 0xFFFFFF);
+        gui.drawString(font, Component.translatable("config.simpleportals.keyToggleGrid"),
+                rowLeft + 12, keySectionY + 106, 0xFFFFFF);
 
         // Redraw widgets on top
         overlayBtn.render(gui, mouseX, mouseY, delta);
@@ -229,6 +235,7 @@ public class SimplePortalsConfigScreen extends Screen {
         keyModeWheelBtn.render(gui, mouseX, mouseY, delta);
         keySnapGridBtn.render(gui, mouseX, mouseY, delta);
         keySnapPointBtn.render(gui, mouseX, mouseY, delta);
+        keyToggleGridBtn.render(gui, mouseX, mouseY, delta);
     }
 
     @Override

@@ -2,6 +2,7 @@ package net.iskaa303.simpleportals.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.iskaa303.simpleportals.client.gui.DragController;
 import net.iskaa303.simpleportals.item.PointDataStore;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
@@ -41,12 +42,17 @@ public final class SavedPointsRenderer {
 
         for (int i = 0; i < pointList.size(); i++) {
             CompoundTag tag = pointList.getCompound(i);
-            Vec3 center = new Vec3(tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"));
+            Vec3 storedCenter = new Vec3(tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"));
             String uuid = tag.getString("id");
             ListTag conns = tag.getList("connections", Tag.TAG_STRING);
 
+            // Apply drag offset
+            Vec3 center = DragController.getDisplayPosition(storedCenter, uuid);
+
             float[] color;
-            if (selectedUuid != null && !selectedUuid.isEmpty() && selectedUuid.equals(uuid)) {
+            if (DragController.isPointAffected(uuid)) {
+                color = DragController.DRAG_POINT_COLOR;
+            } else if (selectedUuid != null && !selectedUuid.isEmpty() && selectedUuid.equals(uuid)) {
                 color = POINT_SELECTED;
             } else if (!conns.isEmpty()) {
                 color = POINT_CONN;
@@ -63,7 +69,7 @@ public final class SavedPointsRenderer {
     private static void renderConnections(@Nonnull PoseStack ps, VertexConsumer b, @Nonnull ListTag points, @Nonnull Vec3 camPos) {
         for (int i = 0; i < points.size(); i++) {
             CompoundTag tagA = points.getCompound(i);
-            Vec3 a = new Vec3(tagA.getDouble("x"), tagA.getDouble("y"), tagA.getDouble("z"));
+            Vec3 storedA = new Vec3(tagA.getDouble("x"), tagA.getDouble("y"), tagA.getDouble("z"));
             String uuidA = tagA.getString("id");
 
             ListTag conns = tagA.getList("connections", Tag.TAG_STRING);
@@ -73,9 +79,16 @@ public final class SavedPointsRenderer {
 
                 CompoundTag tagB = findTagByUuid(points, uuidB);
                 if (tagB == null) continue;
-                Vec3 b2 = new Vec3(tagB.getDouble("x"), tagB.getDouble("y"), tagB.getDouble("z"));
+                Vec3 storedB = new Vec3(tagB.getDouble("x"), tagB.getDouble("y"), tagB.getDouble("z"));
 
-                RenderUtils.renderLine(ps, b, a, b2, CONN_ALPHA,
+                Vec3 a = DragController.getDisplayPosition(storedA, uuidA);
+                Vec3 b2 = DragController.getDisplayPosition(storedB, uuidB);
+
+                float alpha = DragController.isConnectionAffected(uuidA, uuidB)
+                        ? DragController.DRAG_CONN_ALPHA
+                        : CONN_ALPHA;
+
+                RenderUtils.renderLine(ps, b, a, b2, alpha,
                         a.subtract(b2).normalize(), camPos, 2.0);
             }
         }

@@ -2,6 +2,7 @@ package net.iskaa303.simpleportals.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.iskaa303.simpleportals.client.gui.DragController;
 import net.iskaa303.simpleportals.client.targeting.TargetSelector;
 import net.iskaa303.simpleportals.item.PointDataStore;
 import net.minecraft.nbt.CompoundTag;
@@ -31,16 +32,39 @@ public final class SurfaceRenderer {
         ListTag surfaces = PointDataStore.getSurfaces(player);
         for (int i = 0; i < surfaces.size(); i++) {
             CompoundTag surf = surfaces.getCompound(i);
-            List<Vec3> verts = PointDataStore.getSurfacePositions(player, surf);
+            String surfId = surf.getString("surface_id");
+            List<Vec3> verts = getSurfacePositionsWithDrag(player, surf);
             if (verts.size() < 3) continue;
-            renderPolygon(ps, builder, verts, SURFACE_FILL, SURFACE_OUTLINE, camPos);
+            float[] fill, outline;
+            if (DragController.isSurfaceAffected(surfId)) {
+                fill = DragController.DRAG_SURFACE_FILL;
+                outline = DragController.DRAG_SURFACE_OUTLINE;
+            } else {
+                fill = SURFACE_FILL;
+                outline = SURFACE_OUTLINE;
+            }
+            renderPolygon(ps, builder, verts, fill, outline, camPos);
         }
 
-        // Render preview surface (when holding Surface Stick, cursor on a point with a cycle)
+        // Render preview surface (cursor on point with cycle)
         List<Vec3> previewVerts = TargetSelector.getPreviewSurfaceVertices();
         if (previewVerts != null && previewVerts.size() >= 3) {
             renderPolygon(ps, builder, previewVerts, PREVIEW_FILL, PREVIEW_OUTLINE, camPos);
         }
+    }
+
+    /** Get surface vertex positions, applying drag offsets. */
+    private static List<Vec3> getSurfacePositionsWithDrag(@Nonnull Player player, @Nonnull CompoundTag surf) {
+        List<Vec3> positions = new java.util.ArrayList<>();
+        ListTag pts = surf.getList("points", Tag.TAG_STRING);
+        for (int i = 0; i < pts.size(); i++) {
+            String uuid = pts.getString(i);
+            Vec3 stored = PointDataStore.getPointPosByUuid(player, uuid);
+            if (stored != null) {
+                positions.add(DragController.getDisplayPosition(stored, uuid));
+            }
+        }
+        return positions;
     }
 
     /**
