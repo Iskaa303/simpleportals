@@ -2,30 +2,36 @@ package net.iskaa303.simpleportals.client.gui;
 
 import net.iskaa303.simpleportals.client.keybinds.SimplePortalsKeybinds;
 import net.iskaa303.simpleportals.client.targeting.TargetSelector;
-import net.iskaa303.simpleportals.item.PointDataStore;
+import net.iskaa303.simpleportals.entity.PortalEntity;
+import net.iskaa303.simpleportals.entity.PortalSyncPayload;
+import net.iskaa303.simpleportals.entity.PortalWorldData;
+import net.iskaa303.simpleportals.platform.SimplePortalsAgnos;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
- * Manages surface copy and connect/disconnect operations triggered by key presses
- * while a surface is under the cursor.
+ * Manages portal copy, connect/disconnect, and unlink operations.
+ * Uses the integrated server for singleplayer operations.
  */
 public final class SurfaceTransformController {
 
-    // Edge detection
     private static boolean wasCopyDown = false;
     private static boolean wasConnectDown = false;
+    private static String selectedPortalUuid = null;
 
     private SurfaceTransformController() {}
 
-    /** Called every client tick. */
     public static void tick() {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
@@ -37,40 +43,52 @@ public final class SurfaceTransformController {
             return;
         }
 
-        String surfaceAtCursor = findSurfaceAtCursor(player);
+        PortalEntity portalAtCursor = findPortalAtCursor(player);
 
         // --- Copy (C) ---
         boolean copyDown = SimplePortalsKeybinds.isDown(SimplePortalsKeybinds.getCopySurface());
-        if (copyDown && !wasCopyDown && surfaceAtCursor != null) {
-            String newId = PointDataStore.copySurface(player, surfaceAtCursor);
-            if (!newId.isEmpty()) {
-                player.displayClientMessage(
-                        net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_copied"), true);
-            }
+        if (copyDown && !wasCopyDown && portalAtCursor != null) {
+            handleCopy(player, portalAtCursor);
         }
         wasCopyDown = copyDown;
 
-        // --- Connect/Disconnect (Z) ---
+        // --- Connect (Z) and Unlink-all (Alt+Z) ---
         boolean connectDown = SimplePortalsKeybinds.isDown(SimplePortalsKeybinds.getConnectSurface());
         if (connectDown && !wasConnectDown) {
-            handleConnect(player, surfaceAtCursor);
+            if (Screen.hasAltDown() && portalAtCursor != null) {
+                handleUnlinkAll(player, portalAtCursor);
+            } else {
+                handleConnect(player, portalAtCursor);
+            }
         }
         wasConnectDown = connectDown;
     }
 
     // ─── Public queries for overlay hints ───
 
-    /** Returns a surface ID if the cursor is near a surface, else null. */
     @Nullable
-    public static String getSurfaceAtCursor() {
+    public static PortalEntity getPortalAtCursor() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return null;
-        return findSurfaceAtCursor((LocalPlayer) mc.player);
+        return findPortalAtCursor((LocalPlayer) mc.player);
     }
 
-    /** True if the cursor is near any surface (for overlay hints). */
     public static boolean isNearSurface() {
-        return getSurfaceAtCursor() != null;
+        return getPortalAtCursor() != null;
+    }
+
+    @Nullable
+    public static String getSelectedPortalUuid() {
+        return selectedPortalUuid;
+    }
+
+    // ─── Integrated server access (singleplayer) ───
+
+    @Nullable
+    private static ServerLevel getServerLevel() {
+        var mc = Minecraft.getInstance();
+        var server = mc.getSingleplayerServer();
+        return server != null ? server.overworld() : null;
     }
 
     // ─── Private helpers ───
@@ -80,80 +98,202 @@ public final class SurfaceTransformController {
         wasConnectDown = false;
     }
 
-    /** Find surface whose points are closest to cursor. */
     @Nullable
-    private static String findSurfaceAtCursor(LocalPlayer player) {
+    private static PortalEntity findPortalAtCursor(LocalPlayer player) {
         Vec3 target = TargetSelector.getCurrentTarget();
         if (target == null) return null;
-        var surfaces = PointDataStore.getSurfaces(player);
-        double best = Double.MAX_VALUE;
-        String bestId = null;
-        for (int i = 0; i < surfaces.size(); i++) {
-            var s = surfaces.getCompound(i);
-            String id = s.getString("surface_id");
-            var pts = s.getList("points", net.minecraft.nbt.Tag.TAG_STRING);
-            for (int j = 0; j < pts.size(); j++) {
-                Vec3 p = PointDataStore.getPointPosByUuid(player, pts.getString(j));
-                if (p == null) continue;
-                double d = p.distanceToSqr(target);
-                if (d < best) {
-                    best = d;
-                    bestId = id;
-                }
+        PortalEntity best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (PortalEntity portal : PortalWorldData.CLIENT_PORTALS.values()) {
+            Vec3 centroid = portal.getCentroid();
+            double d = centroid.distanceToSqr(target);
+            if (d < bestDist && d < 16.0) {
+                bestDist = d;
+                best = portal;
             }
         }
-        if (bestId != null && best < 9.0) return bestId; // within 3 blocks
-        return null;
+        return best;
     }
 
-    // ─── Connect ───
+    // ─── Copy ───
 
-    private static void handleConnect(LocalPlayer player, @Nullable String surfaceAtCursor) {
-        if (surfaceAtCursor == null) return;
-        String otherId = findNearestSurface(player, surfaceAtCursor);
-        if (otherId == null) {
-            player.displayClientMessage(
-                    net.minecraft.network.chat.Component.translatable("message.simpleportals.no_surface_nearby"), true);
+    private static void handleCopy(LocalPlayer player, PortalEntity source) {
+        ServerLevel level = getServerLevel();
+        if (level == null) return;
+        var data = PortalWorldData.get(level);
+        var newPortal = PortalEntity.create(source.getVertices(), source.getR(), source.getG(), source.getB());
+        data.addPortal(newPortal);
+        SimplePortalsAgnos.syncPortalToAll(level, PortalSyncPayload.createPortal(newPortal));
+        player.displayClientMessage(
+                net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_copied"), true);
+    }
+
+    // ─── Unlink all ───
+
+    private static void handleUnlinkAll(LocalPlayer player, PortalEntity portal) {
+        ServerLevel level = getServerLevel();
+        if (level == null) return;
+        var data = PortalWorldData.get(level);
+        data.unlinkAllPortals(portal.getUuid());
+        // Re-sync to update colors
+        for (PortalEntity p : data.getAllPortals()) {
+            SimplePortalsAgnos.syncPortalToAll(level, PortalSyncPayload.createPortal(p));
+        }
+        player.displayClientMessage(
+                net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_disconnected"), true);
+    }
+
+    // ─── Connect/Disconnect ───
+
+    private static void handleConnect(LocalPlayer player, @Nullable PortalEntity portalAtCursor) {
+        if (portalAtCursor == null) {
+            if (selectedPortalUuid != null) {
+                selectedPortalUuid = null;
+                player.displayClientMessage(
+                        net.minecraft.network.chat.Component.translatable("message.simpleportals.endpoint_deselected"), true);
+            }
             return;
         }
-        if (!PointDataStore.hasSameShape(player, surfaceAtCursor, otherId)) {
+
+        String cursorUuid = portalAtCursor.getUuid().toString();
+
+        if (selectedPortalUuid == null) {
+            selectedPortalUuid = cursorUuid;
             player.displayClientMessage(
-                    net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_shape_mismatch"), true);
-            return;
-        }
-        if (PointDataStore.areSurfacesConnected(player, surfaceAtCursor, otherId)) {
-            PointDataStore.disconnectSurfaces(player, surfaceAtCursor, otherId);
+                    net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_selected"), true);
+        } else if (selectedPortalUuid.equals(cursorUuid)) {
+            selectedPortalUuid = null;
             player.displayClientMessage(
-                    net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_disconnected"), true);
+                    net.minecraft.network.chat.Component.translatable("message.simpleportals.endpoint_deselected"), true);
         } else {
-            PointDataStore.connectSurfaces(player, surfaceAtCursor, otherId);
-            player.displayClientMessage(
-                    net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_connected"), true);
+            // Two different portals — attempt connect/disconnect
+            ServerLevel level = getServerLevel();
+            if (level != null) {
+                var data = PortalWorldData.get(level);
+                PortalEntity portalA = data.getPortal(UUID.fromString(selectedPortalUuid));
+                PortalEntity portalB = data.getPortal(UUID.fromString(cursorUuid));
+
+                if (portalA != null && portalB != null) {
+                    if (hasSameShape(portalA, portalB)) {
+                        boolean connected = data.arePortalsConnected(portalA, portalB);
+                        if (connected) {
+                            data.disconnectPortals(portalA, portalB);
+                            player.displayClientMessage(
+                                    net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_disconnected"), true);
+                        } else {
+                            data.connectPortals(portalA, portalB);
+                            player.displayClientMessage(
+                                    net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_connected"), true);
+                        }
+                        // Re-sync both portals
+                        SimplePortalsAgnos.syncPortalToAll(level, PortalSyncPayload.createPortal(
+                                data.getPortal(portalA.getUuid())));
+                        SimplePortalsAgnos.syncPortalToAll(level, PortalSyncPayload.createPortal(
+                                data.getPortal(portalB.getUuid())));
+                    } else {
+                        player.displayClientMessage(
+                                net.minecraft.network.chat.Component.translatable("message.simpleportals.surface_shape_mismatch"), true);
+                    }
+                }
+            }
+            selectedPortalUuid = null;
         }
     }
 
-    @Nullable
-    private static String findNearestSurface(LocalPlayer player, String excludeId) {
-        var surfaces = PointDataStore.getSurfaces(player);
-        Vec3 target = TargetSelector.getCurrentTarget();
-        if (target == null) return null;
-        double best = Double.MAX_VALUE;
-        String bestId = null;
-        for (int i = 0; i < surfaces.size(); i++) {
-            var s = surfaces.getCompound(i);
-            String id = s.getString("surface_id");
-            if (id.equals(excludeId)) continue;
-            var pts = s.getList("points", net.minecraft.nbt.Tag.TAG_STRING);
-            for (int j = 0; j < pts.size(); j++) {
-                Vec3 p = PointDataStore.getPointPosByUuid(player, pts.getString(j));
-                if (p == null) continue;
-                double d = p.distanceToSqr(target);
-                if (d < best) {
-                    best = d;
-                    bestId = id;
+    /**
+     * Shape comparison that handles scaling, rotation, and translation.
+     * Compares normalized edge-length profiles.
+     */
+    /**
+     * Shape comparison that handles scaling, rotation, translation, and reflection.
+     * Projects both polygons into their own 2D planes, normalizes translation + scale,
+     * then compares side lengths and internal angles.
+     */
+    /**
+     * Polygon similarity using exact cyclic signature matching (0-error geometric approach).
+     * Signature = interleaved [s1, θ1, s2, θ2, ...] where s are normalized edge lengths
+     * and θ are interior angles. Normalization by first edge length handles scaling.
+     */
+    public static boolean hasSameShape(PortalEntity a, PortalEntity b) {
+        var vertsA = a.getVertices();
+        var vertsB = b.getVertices();
+        int n = vertsA.size();
+        if (n < 3 || n != vertsB.size()) return false;
+
+        double[] sigA = buildSignature(vertsA);
+        double[] sigB = buildSignature(vertsB);
+        if (sigA == null || sigB == null) return false;
+
+        // Cyclic matching: duplicate sigA, search for sigB within it
+        int m = n * 2;
+        double[] doubled = new double[m * 2]; // each element is [s_i, θ_i] pair
+        for (int i = 0; i < m; i++) {
+            doubled[i * 2] = sigA[(i % n) * 2];
+            doubled[i * 2 + 1] = sigA[(i % n) * 2 + 1];
+        }
+
+        // Search for sigB in doubled (forward)
+        if (containsSignature(doubled, n * 2, sigB, n * 2)) return true;
+
+        // Search for reversed sigB (reflection)
+        double[] revSigB = new double[n * 2];
+        for (int i = 0; i < n; i++) {
+            revSigB[i * 2] = sigB[((n - 1 - i) % n) * 2];         // reversed side
+            revSigB[i * 2 + 1] = sigB[((n - 1 - i) % n) * 2 + 1]; // reversed angle
+        }
+        return containsSignature(doubled, n * 2, revSigB, n * 2);
+    }
+
+    /** Check if needle (length m) appears in haystack (length h) within epsilon tolerance. */
+    private static boolean containsSignature(double[] haystack, int h, double[] needle, int m) {
+        double eps = 1e-9;
+        for (int start = 0; start <= h - m; start++) {
+            boolean match = true;
+            for (int i = 0; i < m; i++) {
+                if (Math.abs(haystack[start + i] - needle[i]) > eps) {
+                    match = false;
+                    break;
                 }
             }
+            if (match) return true;
         }
-        return (bestId != null && best < 9.0) ? bestId : null;
+        return false;
+    }
+
+    /** Build polygon signature: [s1, θ1, s2, θ2, ...] with edge lengths normalized by first edge. */
+    @Nullable
+    private static double[] buildSignature(java.util.List<Vec3> verts) {
+        int n = verts.size();
+        if (n < 3) return null;
+
+        double[] sides = new double[n];
+        for (int i = 0; i < n; i++) {
+            sides[i] = verts.get(i).distanceTo(verts.get((i + 1) % n));
+        }
+
+        // Normalize by first edge length (handles scaling)
+        double s0 = sides[0];
+        if (s0 < 1e-10) return null;
+        for (int i = 0; i < n; i++) sides[i] /= s0;
+
+        double[] angles = new double[n];
+        for (int i = 0; i < n; i++) {
+            int prev = (i - 1 + n) % n;
+            int next = (i + 1) % n;
+            Vec3 a = verts.get(prev);
+            Vec3 b = verts.get(i);
+            Vec3 c = verts.get(next);
+            Vec3 ba = a.subtract(b).normalize();
+            Vec3 bc = c.subtract(b).normalize();
+            double dot = ba.dot(bc);
+            angles[i] = Math.acos(Math.max(-1, Math.min(1, dot)));
+        }
+
+        double[] sig = new double[n * 2];
+        for (int i = 0; i < n; i++) {
+            sig[i * 2] = sides[i];
+            sig[i * 2 + 1] = angles[i];
+        }
+        return sig;
     }
 }

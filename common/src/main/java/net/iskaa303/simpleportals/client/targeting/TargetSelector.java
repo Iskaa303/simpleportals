@@ -235,27 +235,24 @@ public final class TargetSelector {
     }
 
     /** Snap to nearest surface edge segment, store endpoints for stretched cursor. */
+    /** Snap to nearest portal edge segment, store endpoints for cursor highlight. */
     private static Vec3 snapToNearestSurface(@Nonnull LocalPlayer player, @Nonnull Vec3 pos) {
-        ListTag surfaces = PointDataStore.getSurfaces(player);
+        var portals = net.iskaa303.simpleportals.entity.PortalWorldData.CLIENT_PORTALS.values();
         Vec3 bestPoint = null;
         String bestSurfaceId = null;
         Vec3 bestA = null;
         Vec3 bestB = null;
+        java.util.List<Vec3> bestVerts = null;
         double bestDistSqr = Double.MAX_VALUE;
 
-        for (int s = 0; s < surfaces.size(); s++) {
-            CompoundTag surf = surfaces.getCompound(s);
-            String surfId = surf.getString("surface_id");
-            ListTag ptUuids = surf.getList("points", Tag.TAG_STRING);
-            int n = ptUuids.size();
+        for (var portal : portals) {
+            var verts = portal.getVertices();
+            int n = verts.size();
             if (n < 2) continue;
+            String surfId = portal.getUuid().toString();
             for (int i = 0; i < n; i++) {
-                String uuidA = ptUuids.getString(i);
-                String uuidB = ptUuids.getString((i + 1) % n);
-                Vec3 a = PointDataStore.getPointPosByUuid(player, uuidA);
-                Vec3 b = PointDataStore.getPointPosByUuid(player, uuidB);
-                if (a == null || b == null) continue;
-
+                Vec3 a = verts.get(i);
+                Vec3 b = verts.get((i + 1) % n);
                 Vec3 closest = closestPointOnSegment(pos, a, b);
                 double distSqr = pos.distanceToSqr(closest);
                 if (distSqr < bestDistSqr) {
@@ -264,25 +261,13 @@ public final class TargetSelector {
                     bestSurfaceId = surfId;
                     bestA = a;
                     bestB = b;
+                    bestVerts = verts;
                 }
             }
         }
 
         if (bestPoint != null) {
-            // Store full polygon vertices for the surface highlight
-            List<Vec3> fullVerts = new java.util.ArrayList<>();
-            for (int s2 = 0; s2 < surfaces.size(); s2++) {
-                CompoundTag check = surfaces.getCompound(s2);
-                if (check.getString("surface_id").equals(bestSurfaceId)) {
-                    ListTag ptUuids = check.getList("points", Tag.TAG_STRING);
-                    for (int k = 0; k < ptUuids.size(); k++) {
-                        Vec3 p = PointDataStore.getPointPosByUuid(player, ptUuids.getString(k));
-                        if (p != null) fullVerts.add(p);
-                    }
-                    break;
-                }
-            }
-            snappedSurfaceVertices = fullVerts;
+            snappedSurfaceVertices = bestVerts;
             snappedSurfaceId = bestSurfaceId;
             snappedSurfaceA = bestA;
             snappedSurfaceB = bestB;

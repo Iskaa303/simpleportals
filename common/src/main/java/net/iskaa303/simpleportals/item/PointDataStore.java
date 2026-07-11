@@ -33,11 +33,12 @@ public class PointDataStore {
     private static final String SURFACES_KEY = "surfaces";
     private static final String SURFACE_ID_KEY = "surface_id";
     private static final String SURFACE_POINTS_KEY = "points";
+    private static final String CONNECTED_SURFACES_KEY = "connected_surfaces";
+    private static final String PORTAL_UUID_KEY = "portal_uuid";
     private static final String COLOR_R_KEY = "color_r";
     private static final String COLOR_G_KEY = "color_g";
     private static final String COLOR_B_KEY = "color_b";
     private static final String COLOR_A_KEY = "color_a";
-    private static final String CONNECTED_SURFACES_KEY = "connected_surfaces";
     private static final double EPSILON = 0.0001;
     private static final String MODE_KEY = "portal_stick_mode";
 
@@ -156,6 +157,24 @@ public class PointDataStore {
         data.put(POINTS_KEY, list);
         setData(player, data);
     }
+
+    /** Add a point with a specific UUID (used by portal editor data population). */
+    public static void addPointWithUuid(@Nonnull Player player, @Nonnull String uuid, @Nonnull Vec3 pos) {
+        CompoundTag data = getData(player);
+        ListTag list = data.getList(POINTS_KEY, Tag.TAG_COMPOUND);
+        // Remove existing point with same UUID if present
+        list.removeIf(t -> ((CompoundTag)t).getString(ID_KEY).equals(uuid));
+        CompoundTag pTag = new CompoundTag();
+        pTag.putString(ID_KEY, uuid);
+        pTag.putDouble(X_KEY, pos.x);
+        pTag.putDouble(Y_KEY, pos.y);
+        pTag.putDouble(Z_KEY, pos.z);
+        pTag.put(CONNECTIONS_KEY, new ListTag());
+        list.add(pTag);
+        data.put(POINTS_KEY, list);
+        setData(player, data);
+    }
+
     public static void togglePoint(@Nonnull Player player, @Nonnull Vec3 targetPos) {
         CompoundTag data = getData(player);
         ListTag list = data.getList(POINTS_KEY, Tag.TAG_COMPOUND);
@@ -312,11 +331,12 @@ public class PointDataStore {
         return COLOR_RNG.nextInt(SURFACE_COLORS.length);
     }
 
-    public static void addSurface(@Nonnull Player player, @Nonnull List<String> orderedUuids) {
+    public static void addSurface(@Nonnull Player player, @Nonnull List<String> orderedUuids, @Nonnull String portalUuid) {
         CompoundTag data = getData(player);
         ListTag surfaces = data.getList(SURFACES_KEY, Tag.TAG_COMPOUND);
         CompoundTag surf = new CompoundTag();
         surf.putString(SURFACE_ID_KEY, UUID.randomUUID().toString());
+        surf.putString(PORTAL_UUID_KEY, portalUuid);
         ListTag pointIds = new ListTag();
         for (String uuid : orderedUuids) {
             pointIds.add(StringTag.valueOf(uuid));
@@ -333,10 +353,20 @@ public class PointDataStore {
         setData(player, data);
     }
 
-    public static void removeSurface(@Nonnull Player player, @Nonnull String surfaceId) {
+    /** Remove a surface and return the stored portal UUID (or null). */
+    @Nullable
+    public static String removeSurface(@Nonnull Player player, @Nonnull String surfaceId) {
         CompoundTag data = getData(player);
-        // Remove this surface from any connected surfaces' lists
         ListTag surfaces = data.getList(SURFACES_KEY, Tag.TAG_COMPOUND);
+        String portalUuid = null;
+        for (int i = 0; i < surfaces.size(); i++) {
+            CompoundTag s = surfaces.getCompound(i);
+            if (s.getString(SURFACE_ID_KEY).equals(surfaceId)) {
+                portalUuid = s.contains(PORTAL_UUID_KEY) ? s.getString(PORTAL_UUID_KEY) : null;
+                break;
+            }
+        }
+        // Remove this surface from any connected surfaces' lists
         for (int i = 0; i < surfaces.size(); i++) {
             CompoundTag s = surfaces.getCompound(i);
             List<String> conns = getConnectedSurfacesList(s);
@@ -347,7 +377,9 @@ public class PointDataStore {
         surfaces.removeIf(t -> ((CompoundTag)t).getString(SURFACE_ID_KEY).equals(surfaceId));
         data.put(SURFACES_KEY, surfaces);
         setData(player, data);
+        return portalUuid;
     }
+
 
     @Nonnull
     public static ListTag getSurfaces(@Nonnull Player player) {

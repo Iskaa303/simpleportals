@@ -1,0 +1,25 @@
+{
+  "format": "POSITION_COLOR",
+  "mode": "TRIANGLES",
+  "bufferSize": "TRANSIENT",
+  "sort": true,
+  "layers": [
+    {
+      "type": "minecraft:shader",
+      "name": "rendertype_gui"
+    },
+    {
+      "type": "minecraft:depth_test",
+      "mode": "lequal"
+    },
+    {
+      "type": "minecraft:transparency",
+      "mode": "translucent"
+    },
+    {
+      "type": "minecraft:write_mask",
+      "color": true,
+      "depth": false
+    }
+  ]
+}

@@ -44,6 +44,7 @@
     "message.simpleportals.surface_copied": "§aSurface copied",
     "message.simpleportals.surface_connected": "§aSurfaces connected",
     "message.simpleportals.surface_disconnected": "§cSurfaces disconnected",
+    "message.simpleportals.surface_selected": "§eSurface selected — press Z on another to connect",
     "message.simpleportals.no_surface_nearby": "§7No nearby surface to connect",
     "message.simpleportals.surface_shape_mismatch": "§cSurfaces must have same number of points to connect"
 }

@@ -146,32 +146,40 @@ public final class DragController {
                 shouldCancelUse = true;
             }
             case SURFACE -> {
-                String[] surf = pickSurface(player, target);
-                if (surf == null) return;
-                mode = DragMode.SURFACE;
-                draggedSurfaceId = surf[0];
-                surfacePointUuids.clear();
-                ListTag surfaces = PointDataStore.getSurfaces(player);
-                for (int i = 0; i < surfaces.size(); i++) {
-                    CompoundTag s = surfaces.getCompound(i);
-                    if (s.getString("surface_id").equals(draggedSurfaceId)) {
-                        ListTag ptUuids = s.getList("points", Tag.TAG_STRING);
-                        for (int j = 0; j < ptUuids.size(); j++) {
-                            String uuid = ptUuids.getString(j);
-                            surfacePointUuids.add(uuid);
-                            Vec3 p = PointDataStore.getPointPosByUuid(player, uuid);
-                            if (p != null) originalPositions.put(uuid, p);
-                        }
-                        break;
+                // Find portal entity near cursor (same logic as SurfaceTransformController)
+                Vec3 target2 = target;
+                net.iskaa303.simpleportals.entity.PortalEntity portal = null;
+                double bestDist = Double.MAX_VALUE;
+                for (var p : net.iskaa303.simpleportals.entity.PortalWorldData.CLIENT_PORTALS.values()) {
+                    Vec3 centroid = p.getCentroid();
+                    double d = centroid.distanceToSqr(target2);
+                    if (d < bestDist && d < 16.0) {
+                        bestDist = d;
+                        portal = p;
                     }
                 }
-                dragStartTarget = target;
+                if (portal == null) return;
+                mode = DragMode.SURFACE;
+                draggedSurfaceId = portal.getUuid().toString();
+                surfacePointUuids.clear();
+                // Collect all editor points for this portal
+                for (var vert : portal.getVertices()) {
+                    // Find editor point UUID by position
+                    String uuid = PointDataStore.findPointUuid(player, vert, 0.5);
+                    if (uuid != null) {
+                        surfacePointUuids.add(uuid);
+                        Vec3 p = PointDataStore.getPointPosByUuid(player, uuid);
+                        if (p != null) originalPositions.put(uuid, p);
+                    }
+                }
+                if (surfacePointUuids.isEmpty()) return;
+                dragStartTarget = target2;
                 shouldCancelUse = true;
             }
         }
     }
 
-    /** Finalise positions — write offsets into PointDataStore. */
+    /** Finalise positions — write offsets into PointDataStore and update portals + sync. */
     private static void endDrag() {
         if (mode == DragMode.NONE) return;
         Minecraft mc = Minecraft.getInstance();
@@ -180,14 +188,28 @@ public final class DragController {
             Vec3 target = TargetSelector.getCurrentTarget();
             if (target != null && dragStartTarget != null) {
                 Vec3 delta = target.subtract(dragStartTarget);
+                java.util.Set<String> modifiedPortals = new java.util.HashSet<>();
                 for (Map.Entry<String, Vec3> e : originalPositions.entrySet()) {
                     Vec3 newPos = e.getValue().add(delta);
-                    // Update the stored point position
                     CompoundTag tag = PointDataStore.getPointByUuid(player, e.getKey());
                     if (tag != null) {
                         tag.putDouble("x", newPos.x);
                         tag.putDouble("y", newPos.y);
                         tag.putDouble("z", newPos.z);
+                    }
+                    String portalUuid = net.iskaa303.simpleportals.entity.PortalWorldData.getPortalUuidForPoint(e.getKey());
+                    if (portalUuid != null) {
+                        int idx = net.iskaa303.simpleportals.entity.PortalWorldData.getVertexIndexForPoint(e.getKey());
+                        net.iskaa303.simpleportals.entity.PortalWorldData.updatePortalVertex(portalUuid, idx, newPos);
+                        modifiedPortals.add(portalUuid);
+                    }
+                }
+                // Send UPDATE packet to server for each modified portal
+                for (String puuid : modifiedPortals) {
+                    var p = net.iskaa303.simpleportals.entity.PortalWorldData.CLIENT_PORTALS.get(java.util.UUID.fromString(puuid));
+                    if (p != null && mc.getConnection() != null) {
+                        mc.getConnection().send(new net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket(
+                                net.iskaa303.simpleportals.entity.PortalSyncPayload.updatePortal(p)));
                     }
                 }
             }

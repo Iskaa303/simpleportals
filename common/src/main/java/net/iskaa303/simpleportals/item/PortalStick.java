@@ -2,8 +2,13 @@ package net.iskaa303.simpleportals.item;
 
 import net.iskaa303.simpleportals.client.gui.DragController;
 import net.iskaa303.simpleportals.client.targeting.TargetSelector;
+import net.iskaa303.simpleportals.entity.PortalEntity;
+import net.iskaa303.simpleportals.entity.PortalSyncPayload;
+import net.iskaa303.simpleportals.entity.PortalWorldData;
+import net.iskaa303.simpleportals.platform.SimplePortalsAgnos;
 import net.iskaa303.simpleportals.registry.SimplePortalsItems;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -50,7 +55,7 @@ public class PortalStick extends Item {
             switch (mode) {
                 case POINT -> handlePointAction(player, target);
                 case CONNECTION -> handleConnectionAction(level, player, target, stack);
-                case SURFACE -> handleSurfaceAction(player, target);
+                case SURFACE -> handleSurfaceAction(level, player, target);
             }
         }
 
@@ -66,7 +71,6 @@ public class PortalStick extends Item {
     // ─── Connection mode ───
 
     private void handleConnectionAction(@Nonnull Level level, @Nonnull Player player, @Nonnull Vec3 target, ItemStack stack) {
-        // If snapped to a connection, delete it on click
         String[] snappedConn = TargetSelector.getSnappedConnectionUuids();
         if (snappedConn != null) {
             PointDataStore.removeConnection(player, snappedConn[0], snappedConn[1]);
@@ -102,29 +106,127 @@ public class PortalStick extends Item {
 
     // ─── Surface mode ───
 
-    private void handleSurfaceAction(@Nonnull Player player, @Nonnull Vec3 target) {
-        // If snapped to a surface edge, delete it on click
-        String snappedSurfaceId = TargetSelector.getSnappedSurfaceId();
-        if (snappedSurfaceId != null) {
-            PointDataStore.removeSurface(player, snappedSurfaceId);
-            player.displayClientMessage(Component.translatable("message.simpleportals.surface_removed"), true);
-            return;
+    private void handleSurfaceAction(@Nonnull Level level, @Nonnull Player player, @Nonnull Vec3 target) {
+        // Check if looking at an existing portal entity — delete it
+        if (level instanceof ServerLevel serverLevel) {
+            PortalWorldData data = PortalWorldData.get(serverLevel);
+            PortalEntity hitPortal = findPortalAt(player, target);
+            if (hitPortal != null) {
+                data.removePortal(hitPortal.getUuid());
+                SimplePortalsAgnos.syncPortalToAll(serverLevel, PortalSyncPayload.deletePortal(hitPortal.getUuid()));
+                player.displayClientMessage(Component.translatable("message.simpleportals.surface_removed"), true);
+                return;
+            }
         }
 
+        // Find a cycle among editor points (from existing portals or user-created)
         String pointUuid = PointDataStore.findPointUuid(player, target);
         if (pointUuid == null) {
             player.displayClientMessage(Component.translatable("message.simpleportals.no_point_at_cursor"), true);
             return;
         }
 
-        List<String> cycle = PointDataStore.findSmallestCycleContaining(player, pointUuid);
+        java.util.List<String> cycle = PointDataStore.findSmallestCycleContaining(player, pointUuid);
         if (cycle == null || cycle.size() < 3) {
             player.displayClientMessage(Component.translatable("message.simpleportals.no_loop_found"), true);
             return;
         }
 
-        PointDataStore.addSurface(player, cycle);
+        // Compute vertex positions
+        var positions = PointDataStore.getPositionsByUuids(player, cycle);
+
+        if (level instanceof ServerLevel serverLevel) {
+            PortalWorldData data = PortalWorldData.get(serverLevel);
+
+            // Save external connections from cycle points to non-cycle points
+            // Map: externalPointUuid → list of cycle point UUIDs it's connected to
+            java.util.Map<String, java.util.HashSet<String>> externalToCycle = new java.util.HashMap<>();
+            java.util.Set<String> cycleSet = new java.util.HashSet<>(cycle);
+            for (String cpUuid : cycle) {
+                for (String conn : PointDataStore.getConnections(player, cpUuid)) {
+                    if (!cycleSet.contains(conn)) {
+                        externalToCycle.computeIfAbsent(conn, k -> new java.util.HashSet<>()).add(cpUuid);
+                    }
+                }
+            }
+
+            // Create portal entity
+            java.util.Random rng = new java.util.Random();
+            float[] color = {rng.nextFloat() * 0.8f + 0.2f, rng.nextFloat() * 0.8f + 0.2f, rng.nextFloat() * 0.8f + 0.2f};
+            PortalEntity portal = PortalEntity.create(positions, color[0], color[1], color[2]);
+            data.addPortal(portal);
+            // Sync immediately — client will create editor points with random UUIDs
+            SimplePortalsAgnos.syncPortalToAll(serverLevel, PortalSyncPayload.createPortal(portal));
+
+            // Now reconnect external connections to the new portal's editor points
+            // We need to know the mapping from old cycle point UUIDs to new portal editor point UUIDs.
+            // The client generates these in populateEditorData. For the server side, we regenerate.
+            var newEditorUuids = new java.util.ArrayList<String>();
+            String puuid = portal.getUuid().toString();
+            for (int i = 0; i < cycle.size(); i++) {
+                String newUuid = java.util.UUID.randomUUID().toString();
+                PointDataStore.addPointWithUuid(player, newUuid, positions.get(i));
+                net.iskaa303.simpleportals.entity.PortalWorldData.registerEditorPoint(newUuid, puuid, i);
+                newEditorUuids.add(newUuid);
+            }
+            // Connect consecutive new points
+            for (int i = 0; i < cycle.size(); i++) {
+                String a = newEditorUuids.get(i);
+                String b = newEditorUuids.get((i + 1) % cycle.size());
+                if (!PointDataStore.hasConnection(player, a, b)) {
+                    PointDataStore.addConnection(player, a, b);
+                }
+            }
+            // Reconnect external connections: for each connection from a cycle point to an external point,
+            // replace it with a connection from the new editor point to the external point
+            for (java.util.Map.Entry<String, java.util.HashSet<String>> entry : externalToCycle.entrySet()) {
+                String extUuid = entry.getKey();
+                for (String oldCycleUuid : entry.getValue()) {
+                    int idx = cycle.indexOf(oldCycleUuid);
+                    if (idx >= 0 && idx < newEditorUuids.size()) {
+                        String newCycleUuid = newEditorUuids.get(idx);
+                        // Remove old connection if it still exists
+                        if (PointDataStore.hasConnection(player, oldCycleUuid, extUuid)) {
+                            PointDataStore.removeConnection(player, oldCycleUuid, extUuid);
+                        }
+                        // Add new connection
+                        if (!PointDataStore.hasConnection(player, newCycleUuid, extUuid)) {
+                            PointDataStore.addConnection(player, newCycleUuid, extUuid);
+                        }
+                    }
+                }
+            }
+
+            // Delete the original cycle points from PointDataStore
+            for (String cpUuid : cycle) {
+                PointDataStore.removePointByUuid(player, cpUuid);
+            }
+        }
+
         player.displayClientMessage(Component.translatable("message.simpleportals.surface_created"), true);
+    }
+
+    /** Find the nearest portal entity that the player is looking at. */
+    @Nullable
+    private static PortalEntity findPortalAt(Player player, Vec3 target) {
+        if (!(player.level() instanceof ServerLevel serverLevel)) return null;
+        PortalWorldData data = PortalWorldData.get(serverLevel);
+        Vec3 from = player.getEyePosition();
+        Vec3 to = target;
+        double reach = from.distanceTo(to);
+        if (reach < 0.1) return null;
+        PortalEntity best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (PortalEntity portal : data.getAllPortals()) {
+            if (portal.rayIntersects(from, to)) {
+                double d = portal.getCentroid().distanceToSqr(from);
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = portal;
+                }
+            }
+        }
+        return best;
     }
 
     @Override
@@ -137,8 +239,6 @@ public class PortalStick extends Item {
                                   @Nonnull net.minecraft.core.BlockPos pos, @Nonnull Player player) {
         return false;
     }
-
-
 
     @Nonnull
     public static ItemStack findPortalStick(@Nonnull Player player) {
